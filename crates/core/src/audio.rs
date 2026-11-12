@@ -6,15 +6,22 @@
 //! stays silent.
 
 use crate::error::Error;
+use crate::media::MediaLibrary;
 use crate::paint::hash;
 use crate::scene::AudioSpec;
 
 /// Sample rate shared by the whole pipeline.
 pub const SAMPLE_RATE: u32 = 44_100;
 
-/// Interleaved stereo s16 buffer for the full film duration.
+/// Builds the full audio bed: synthesized BGM and effects, the reserved
+/// narration slot, and every imported audio clip placed on the timeline.
 #[must_use]
-pub fn build_audio(spec: Option<&AudioSpec>, duration_seconds: f64, fps: u32) -> Vec<i16> {
+pub fn build_audio(
+    spec: Option<&AudioSpec>,
+    duration_seconds: f64,
+    fps: u32,
+    media: &mut MediaLibrary,
+) -> Vec<i16> {
     let frames = (duration_seconds * SAMPLE_RATE as f64).ceil() as usize;
     let mut buf = vec![0f32; frames * 2];
 
@@ -40,6 +47,33 @@ pub fn build_audio(spec: Option<&AudioSpec>, duration_seconds: f64, fps: u32) ->
                 narration.volume,
                 fps,
             );
+        }
+        for clip in &spec.clips {
+            // A missing or undecodable import must not abort the render: the
+            // clip stays silent and the rest of the film still compiles.
+            let Ok(samples) = media.audio_pcm(&clip.src) else {
+                continue;
+            };
+            let start = (clip.at as f64 / fps as f64 * SAMPLE_RATE as f64) as usize;
+            let offset = (clip.offset_frames as f64 / fps as f64 * SAMPLE_RATE as f64) as usize;
+            let limit = clip
+                .dur
+                .map(|d| (d as f64 / fps as f64 * SAMPLE_RATE as f64) as usize)
+                .unwrap_or(usize::MAX);
+            let total = frames_len(&buf);
+            for i in 0..limit {
+                let Some(sample) = samples.get(offset + i) else {
+                    break;
+                };
+                let Some(at) = start.checked_add(i) else {
+                    break;
+                };
+                if at >= total {
+                    break;
+                }
+                buf[at * 2] += sample[0] * clip.volume;
+                buf[at * 2 + 1] += sample[1] * clip.volume;
+            }
         }
     }
 

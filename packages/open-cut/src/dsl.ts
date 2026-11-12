@@ -65,18 +65,28 @@ export class Film {
         return this;
     }
 
-    /** Sets the audio bed. `sfx.at` and narration delay are in seconds here;
-     *  the compiler converts them to frames for the IR. Narration is a
-     *  reserved slot: point it at a PCM WAV. */
+    /** Sets the audio bed. `sfx.at`, clip times and narration delay are in
+     *  seconds here; the compiler converts them to frames for the IR. Audio
+     *  files are decoded by the core, never generated. */
     audio(spec: {
         bgm?: { volume?: number; mood?: string } | null;
         narration?: { wav: string; delay?: number; volume?: number } | null;
         sfx?: Array<{ at: number; kind: 'whoosh' | 'tick' | 'impact'; volume?: number }>;
+        clips?: Array<{ src: string; at?: number; dur?: number; offset?: number; volume?: number }>;
     }): this {
         this.audioSpec = {
             bgm: spec.bgm,
-            narration: spec.narration ? { wav: spec.narration.wav, delayFrames: frames(spec.narration.delay ?? 0, this.fps), volume: spec.narration.volume } : null,
+            narration: spec.narration
+                ? { wav: spec.narration.wav, delayFrames: frames(spec.narration.delay ?? 0, this.fps), volume: spec.narration.volume }
+                : null,
             sfx: (spec.sfx ?? []).map((sfx) => ({ ...sfx, at: frames(sfx.at, this.fps) })),
+            clips: (spec.clips ?? []).map((clip) => ({
+                src: clip.src,
+                at: frames(clip.at ?? 0, this.fps),
+                dur: clip.dur === undefined ? null : frames(clip.dur, this.fps),
+                offsetFrames: frames(clip.offset ?? 0, this.fps),
+                volume: clip.volume,
+            })),
         };
         return this;
     }
@@ -241,6 +251,43 @@ export interface FootnoteOptions {
 /** Source line, bottom-left by default — every claim keeps its citation. */
 export function footnote(options: FootnoteOptions): ItemInput {
     return { kind: 'footnote', x: 0.06, y: 0.9, size: 26, align: 'left', color: '#5d6f8c', dur: options.dur ?? 4, ...options } as ItemInput;
+}
+
+/** A still image decoded from disk. Position is the box center. */
+export function image(options: {
+    at?: number;
+    dur?: number;
+    src: string;
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+    fit?: 'contain' | 'cover' | 'stretch';
+    opacity?: number;
+    radius?: number;
+    fadeIn?: number;
+    fadeOut?: number;
+}): ItemInput {
+    return { kind: 'image', x: 0.5, y: 0.5, w: 0.4, h: 0.4, fit: 'contain', opacity: 1, dur: options.dur ?? 4, ...options } as ItemInput;
+}
+
+/** A video clip; `srcIn` is the first source frame to show. */
+export function video(options: {
+    at?: number;
+    dur?: number;
+    src: string;
+    srcIn?: number;
+    x?: number;
+    y?: number;
+    w?: number;
+    h?: number;
+    fit?: 'contain' | 'cover' | 'stretch';
+    opacity?: number;
+    radius?: number;
+    fadeIn?: number;
+    fadeOut?: number;
+}): ItemInput {
+    return { kind: 'video', x: 0.5, y: 0.5, w: 0.4, h: 0.4, fit: 'contain', opacity: 1, dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
 /** The only "timeline" a code-first film shows: a global progress bar. */

@@ -8,6 +8,7 @@ use crate::color::{Rgba, parse, parse_or};
 use crate::ease::{apply, fade};
 use crate::encode::Encoder;
 use crate::error::Error;
+use crate::media::MediaLibrary;
 use crate::paint::{Frame, build_vignette, hash};
 use crate::scene::{Align, Background, Item, Project, ShapeKind};
 use crate::text::Fonts;
@@ -37,11 +38,12 @@ pub fn render_project(
         serde_json::from_str(json).map_err(|e| Error::invalid(format!("project json: {e}")))?;
     validate(&project)?;
     let mut fonts = Fonts::load()?;
+    let mut media = MediaLibrary::new();
     let (w, h, fps) = (project.width, project.height, project.fps);
     let vignette = build_vignette(w, h, 0.55);
     let seconds = project.duration_frames as f64 / fps as f64;
     let has_audio = project.audio.is_some();
-    let audio = build_audio(project.audio.as_ref(), seconds, fps);
+    let audio = build_audio(project.audio.as_ref(), seconds, fps, &mut media);
     let bitrate = (w * h * fps / 2).clamp(2_000_000, 20_000_000);
     let mut encoder = Encoder::open(out, w, h, fps, bitrate, has_audio)?;
     let audio_codec = encoder.audio_codec().to_string();
@@ -51,7 +53,7 @@ pub fn render_project(
     let rate = crate::audio::SAMPLE_RATE as usize;
     let mut written_samples = 0usize;
     for f in 0..total {
-        paint_frame(&project, &mut fonts, &vignette, f, &mut frame);
+        paint_frame(&project, &mut fonts, &mut media, &vignette, f, &mut frame);
         encoder.write_video(&frame.to_nv12(), f, fps)?;
         // Interleave audio with video in one-second blocks.
         if (f + 1) % fps == 0 || f + 1 == total {
@@ -114,6 +116,7 @@ fn validate(project: &Project) -> Result<(), Error> {
 fn paint_frame(
     project: &Project,
     fonts: &mut Fonts,
+    media: &mut MediaLibrary,
     vignette: &[u8],
     frame_index: u32,
     out: &mut Frame,
@@ -128,7 +131,16 @@ fn paint_frame(
         paint_background(out, &scene.background, seconds);
         let local = frame_index - scene.start;
         for item in &scene.items {
-            paint_item(project, fonts, out, item, local, frame_index, seconds);
+            paint_item(
+                project,
+                fonts,
+                media,
+                out,
+                item,
+                local,
+                frame_index,
+                seconds,
+            );
         }
     }
     out.apply_vignette(vignette);
@@ -177,6 +189,7 @@ fn px(x: f32, w: u32) -> f32 {
 fn paint_item(
     project: &Project,
     fonts: &mut Fonts,
+    media: &mut MediaLibrary,
     frame: &mut Frame,
     item: &Item,
     local: u32,
@@ -473,6 +486,83 @@ fn paint_item(
                 );
             }
         }
+        Item::Image {
+            at,
+            dur,
+            src,
+            x,
+            y,
+            w,
+            h,
+            fit,
+            opacity,
+            radius,
+            fade_in,
+            fade_out,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            let life = local - *at;
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * opacity;
+            if alpha <= 0.001 {
+                return;
+            }
+            // A broken import degrades to nothing; rendering the rest still wins.
+            let Ok(bitmap) = media.image(src) else {
+                return;
+            };
+            let (bw, bh) = (px(*w, project.width), px(*h, project.height));
+            frame.draw_bitmap(
+                &bitmap,
+                px(*x, project.width) - bw / 2.0,
+                px(*y, project.height) - bh / 2.0,
+                bw,
+                bh,
+                *fit,
+                alpha,
+                *radius,
+            );
+        }
+        Item::Video {
+            at,
+            dur,
+            src,
+            src_in,
+            x,
+            y,
+            w,
+            h,
+            fit,
+            opacity,
+            radius,
+            fade_in,
+            fade_out,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            let life = local - *at;
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * opacity;
+            if alpha <= 0.001 {
+                return;
+            }
+            let source_seconds = (*src_in + life) as f64 / project.fps as f64;
+            let Ok(bitmap) = media.video_frame(src, source_seconds) else {
+                return;
+            };
+            let (bw, bh) = (px(*w, project.width), px(*h, project.height));
+            frame.draw_bitmap(
+                &bitmap,
+                px(*x, project.width) - bw / 2.0,
+                px(*y, project.height) - bh / 2.0,
+                bw,
+                bh,
+                *fit,
+                alpha,
+                *radius,
+            );
+        }
         Item::Shape {
             at,
             dur,
@@ -625,18 +715,121 @@ mod tests {
         let meta = std::fs::metadata(&out).expect("output exists");
         assert!(meta.len() > 1_000, "mp4 too small: {}", meta.len());
     }
-}
-#[test]
-fn video_only_probe() {
-    let project = serde_json::json!({
-        "width": 320, "height": 240, "fps": 15, "durationFrames": 15,
-        "scenes": [{ "start": 0, "duration": 15,
-            "background": { "kind": "solid", "color": "#101828" },
-            "items": [] }],
-        "audio": null
-    });
-    let out = std::env::temp_dir().join("opencut-video-only.mp4");
-    let stats = super::render_project(&project.to_string(), &out, &mut |_, _| {}).expect("render");
-    assert!(!stats.audio);
-    assert!(std::fs::metadata(&out).unwrap().len() > 500);
+
+    #[test]
+    fn renders_without_audio_track() {
+        let project = serde_json::json!({
+            "width": 320, "height": 240, "fps": 15, "durationFrames": 15,
+            "scenes": [{ "start": 0, "duration": 15,
+                "background": { "kind": "solid", "color": "#101828" },
+                "items": [] }],
+            "audio": null
+        });
+        let out = std::env::temp_dir().join("opencut-video-only.mp4");
+        let stats =
+            super::render_project(&project.to_string(), &out, &mut |_, _| {}).expect("render");
+        assert!(!stats.audio);
+        assert!(std::fs::metadata(&out).unwrap().len() > 500);
+    }
+
+    /// Writes a PNG with our own encoder, imports it back through WIC and
+    /// checks that the pixels survive the round trip.
+    #[test]
+    fn imports_image_roundtrip() {
+        let dir = std::env::temp_dir().join("opencut-media-tests");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("fixture.png");
+        let (width, height) = (64u32, 48u32);
+        let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+        for y in 0..height {
+            for x in 0..width {
+                pixels.extend_from_slice(&[(x * 4) as u8, (y * 5) as u8, 0x40, 0xFF]);
+            }
+        }
+        crate::png::write_png(&path, width, height, &pixels).expect("write png");
+
+        let mut media = crate::media::MediaLibrary::new();
+        let bitmap = media.image(path.to_str().unwrap()).expect("decode png");
+        assert_eq!((bitmap.width, bitmap.height), (width, height));
+        // Row 1, column 3 should come back as encoded (allow 1 bit of slack).
+        let i = (width + 3) as usize * 4;
+        assert!(
+            (i32::from(bitmap.rgba[i]) - 12).abs() <= 2,
+            "red {}",
+            bitmap.rgba[i]
+        );
+        assert!(
+            (i32::from(bitmap.rgba[i + 1]) - 5).abs() <= 2,
+            "green {}",
+            bitmap.rgba[i + 1]
+        );
+        assert!(
+            (i32::from(bitmap.rgba[i + 2]) - 0x40).abs() <= 2,
+            "blue {}",
+            bitmap.rgba[i + 2]
+        );
+    }
+
+    /// Renders a clip with this pipeline, imports it as media, and mixes an
+    /// audio file generated by our own WAV writer.
+    #[test]
+    fn imports_video_and_audio() {
+        let dir = std::env::temp_dir().join("opencut-media-tests");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // 1. Produce a source clip with OpenCut itself.
+        let source = dir.join("source.mp4");
+        let clip = serde_json::json!({
+            "width": 160, "height": 120, "fps": 15, "durationFrames": 15,
+            "scenes": [{ "start": 0, "duration": 15,
+                "background": { "kind": "solid", "color": "#c02030" }, "items": [] }],
+            "audio": null
+        });
+        super::render_project(&clip.to_string(), &source, &mut |_, _| {}).expect("source clip");
+
+        // 1b. Decode the clip back and check the pixels, so a silent import
+        // failure cannot pass as a green test.
+        let mut library = crate::media::MediaLibrary::new();
+        let frame = library
+            .video_frame(source.to_str().unwrap(), 0.1)
+            .expect("decode video frame");
+        assert_eq!((frame.width, frame.height), (160, 120));
+        assert!(
+            frame.rgba[0] > 120 && frame.rgba[1] < 100,
+            "expected the red source, got {:?}",
+            &frame.rgba[0..4]
+        );
+
+        // 2. Write a short PCM16 WAV with our own writer.
+        let wav = dir.join("tone.wav");
+        let mut samples = Vec::new();
+        for i in 0..crate::audio::SAMPLE_RATE as usize / 2 {
+            let t = i as f64 / crate::audio::SAMPLE_RATE as f64;
+            let value = ((t * 440.0 * std::f64::consts::TAU).sin() * 0.4 * i16::MAX as f64) as i16;
+            samples.push(value);
+            samples.push(value);
+        }
+        crate::audio::write_wav(wav.to_str().unwrap(), &samples).expect("wav");
+
+        // 3. Import both in a film.
+        let film = serde_json::json!({
+            "width": 320, "height": 240, "fps": 15, "durationFrames": 30,
+            "scenes": [{ "start": 0, "duration": 30,
+                "background": { "kind": "solid", "color": "#05070f" },
+                "items": [
+                    { "kind": "video", "at": 0, "dur": 30, "src": source.to_str().unwrap(),
+                      "x": 0.5, "y": 0.5, "w": 0.6, "h": 0.6, "fit": "contain" },
+                    { "kind": "image", "at": 0, "dur": 30, "src": dir.join("fixture.png").to_str().unwrap(),
+                      "x": 0.82, "y": 0.18, "w": 0.14, "h": 0.14, "fit": "cover", "radius": 12.0 }
+                ]
+            }],
+            "audio": { "clips": [{ "src": wav.to_str().unwrap(), "at": 0, "volume": 0.8 }] }
+        });
+        let out = dir.join("imported.mp4");
+        let stats =
+            super::render_project(&film.to_string(), &out, &mut |_, _| {}).expect("render imports");
+        assert_eq!(stats.frames, 30);
+        assert!(stats.audio);
+        assert!(std::fs::metadata(&out).unwrap().len() > 2_000);
+    }
 }

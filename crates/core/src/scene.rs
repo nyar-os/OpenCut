@@ -120,6 +120,19 @@ pub enum ShapeKind {
     Line,
 }
 
+/// How a decoded frame is mapped into its layout box.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum Fit {
+    /// Scale to fit inside the box, preserving aspect ratio (letterbox).
+    #[default]
+    Contain,
+    /// Fill the box, preserving aspect ratio, cropping the overflow.
+    Cover,
+    /// Fill the box exactly, ignoring aspect ratio.
+    Stretch,
+}
+
 /// Syntax tone of a code line fragment.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -322,6 +335,48 @@ pub enum Item {
         #[serde(default = "default_fade")]
         fade_out: u32,
     },
+    /// A still image decoded from disk and drawn into a layout box.
+    Image {
+        at: u32,
+        dur: u32,
+        src: String,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        #[serde(default)]
+        fit: Fit,
+        #[serde(default = "default_one")]
+        opacity: f32,
+        #[serde(default)]
+        radius: f32,
+        #[serde(default = "default_fade")]
+        fade_in: u32,
+        #[serde(default = "default_fade")]
+        fade_out: u32,
+    },
+    /// A video stream decoded on demand; `src_in` is the first source frame.
+    Video {
+        at: u32,
+        dur: u32,
+        src: String,
+        #[serde(default)]
+        src_in: u32,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        #[serde(default)]
+        fit: Fit,
+        #[serde(default = "default_one")]
+        opacity: f32,
+        #[serde(default)]
+        radius: f32,
+        #[serde(default = "default_fade")]
+        fade_in: u32,
+        #[serde(default = "default_fade")]
+        fade_out: u32,
+    },
     Progress {
         at: u32,
         dur: u32,
@@ -353,6 +408,26 @@ pub struct AudioSpec {
     pub narration: Option<NarrationSpec>,
     #[serde(default)]
     pub sfx: Vec<SfxSpec>,
+    /// Imported audio placed on the timeline, mixed over the synthesized bed.
+    #[serde(default)]
+    pub clips: Vec<AudioClipSpec>,
+}
+
+/// One imported audio file placed at `at` frames, playing from `offset`.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioClipSpec {
+    pub src: String,
+    #[serde(default)]
+    pub at: u32,
+    /// Length in frames; omitted means "until the file ends".
+    #[serde(default)]
+    pub dur: Option<u32>,
+    /// Source offset in frames skipped before playback starts.
+    #[serde(default)]
+    pub offset_frames: u32,
+    #[serde(default = "default_one")]
+    pub volume: f32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

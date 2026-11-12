@@ -6,6 +6,8 @@
 export type Align = 'left' | 'center' | 'right';
 export type Ease = 'linear' | 'in-out-cubic' | 'out-cubic' | 'out-quint' | 'in-out-sine';
 export type ShapeKind = 'rect' | 'circle' | 'ring' | 'line';
+/** How imported media is mapped into its layout box. */
+export type Fit = 'contain' | 'cover' | 'stretch';
 
 export type Background =
     | { kind: 'solid'; color: string }
@@ -109,6 +111,37 @@ export type Item =
           fadeOut?: number;
       }
     | { kind: 'footnote'; at: number; dur: number; text: string; size?: number; x: number; y: number; align?: Align; color?: string; fadeIn?: number; fadeOut?: number }
+    | {
+          kind: 'image';
+          at: number;
+          dur: number;
+          src: string;
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+          fit?: Fit;
+          opacity?: number;
+          radius?: number;
+          fadeIn?: number;
+          fadeOut?: number;
+      }
+    | {
+          kind: 'video';
+          at: number;
+          dur: number;
+          src: string;
+          srcIn?: number;
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+          fit?: Fit;
+          opacity?: number;
+          radius?: number;
+          fadeIn?: number;
+          fadeOut?: number;
+      }
     | { kind: 'progress'; at: number; dur: number; track?: string | null; fill?: string | null; y?: number | null };
 
 export interface BgmSpec {
@@ -128,10 +161,20 @@ export interface SfxSpec {
     volume?: number;
 }
 
+export interface AudioClipSpec {
+    src: string;
+    at: number;
+    dur?: number | null;
+    offsetFrames?: number;
+    volume?: number;
+}
+
 export interface AudioSpec {
     bgm?: BgmSpec | null;
     narration?: NarrationSpec | null;
     sfx?: SfxSpec[];
+    /** Imported audio placed on the timeline. */
+    clips?: AudioClipSpec[];
 }
 
 export interface Scene {

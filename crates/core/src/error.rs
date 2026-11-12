@@ -39,6 +39,15 @@ impl Error {
         }
     }
 
+    /// Imported media could not be opened or decoded.
+    #[must_use]
+    pub fn media(message: impl Into<String>) -> Self {
+        Self {
+            code: "media",
+            message: message.into(),
+        }
+    }
+
     /// A capability is not implemented on this platform.
     #[must_use]
     pub fn unsupported(message: impl Into<String>) -> Self {

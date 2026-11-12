@@ -4,6 +4,7 @@ dist/
 .cache/
 *.node
 *.mp4
+films/assets/
 *.log
 .DS_Store
 .idea/
