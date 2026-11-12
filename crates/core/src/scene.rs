@@ -17,6 +17,57 @@ pub struct Project {
     pub scenes: Vec<Scene>,
     #[serde(default)]
     pub audio: Option<AudioSpec>,
+    /// One camera curve for the whole film. When present it drives every frame
+    /// continuously, which is what makes a one-take move possible.
+    #[serde(default)]
+    pub camera: Vec<CameraKey>,
+}
+
+/// A key on the global camera curve, positioned by absolute frame.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CameraKey {
+    pub at: u32,
+    pub zoom: f32,
+    #[serde(default = "default_center")]
+    pub focus: [f32; 2],
+    #[serde(default)]
+    pub rotate: f32,
+    /// Easing applied from this key to the next.
+    #[serde(default)]
+    pub ease: Ease,
+}
+
+/// Resolves the global camera at `frame`: `(zoom, focus, rotate)`.
+#[must_use]
+pub fn camera_at(keys: &[CameraKey], frame: u32) -> (f32, [f32; 2], f32) {
+    match keys.len() {
+        0 => (1.0, [0.5, 0.5], 0.0),
+        1 => (keys[0].zoom, keys[0].focus, keys[0].rotate),
+        _ => {
+            let first = &keys[0];
+            if frame <= first.at {
+                return (first.zoom, first.focus, first.rotate);
+            }
+            for pair in keys.windows(2) {
+                let (a, b) = (&pair[0], &pair[1]);
+                if frame <= b.at {
+                    let span = b.at.saturating_sub(a.at).max(1) as f32;
+                    let t = crate::ease::apply(a.ease, (frame - a.at) as f32 / span);
+                    return (
+                        a.zoom + (b.zoom - a.zoom) * t,
+                        [
+                            a.focus[0] + (b.focus[0] - a.focus[0]) * t,
+                            a.focus[1] + (b.focus[1] - a.focus[1]) * t,
+                        ],
+                        a.rotate + (b.rotate - a.rotate) * t,
+                    );
+                }
+            }
+            let last = &keys[keys.len() - 1];
+            (last.zoom, last.focus, last.rotate)
+        }
+    }
 }
 
 /// One temporal block with a background and its items.
@@ -144,6 +195,10 @@ pub enum Ease {
     OutCubic,
     OutQuint,
     InOutSine,
+    OutExpo,
+    InExpo,
+    InOutQuart,
+    OutBack,
 }
 
 /// How a shape is composited onto the frame.
@@ -175,6 +230,10 @@ fn default_grain() -> f32 {
 }
 fn default_grain_density() -> u32 {
     9_000
+}
+
+fn default_layer_edge() -> f32 {
+    0.25
 }
 
 /// Primitive shape kinds.
@@ -467,6 +526,39 @@ pub enum Item {
         #[serde(default = "default_fade")]
         fade_out: u32,
     },
+    /// A nested layer whose opacity follows the camera zoom. Layers crossing at
+    /// the same zoom fade into each other, so a one-take push never cuts.
+    Layer {
+        at: u32,
+        dur: u32,
+        /// Zoom window in which this layer is fully visible.
+        zoom_from: f32,
+        zoom_to: f32,
+        /// Width of the fade at both ends of the window, in zoom ratio.
+        #[serde(default = "default_layer_edge")]
+        edge: f32,
+        #[serde(default)]
+        items: Vec<Item>,
+    },
+    /// A soft additive light source. Additive falloff reads as light in air,
+    /// which a flat disc never does.
+    Glow {
+        at: u32,
+        dur: u32,
+        x: f32,
+        y: f32,
+        /// Radius as a fraction of the frame width.
+        radius: f32,
+        #[serde(default = "default_glow_color")]
+        color: String,
+        /// Peak opacity at the center, 0..1.
+        #[serde(default = "default_one")]
+        intensity: f32,
+        #[serde(default = "default_fade")]
+        fade_in: u32,
+        #[serde(default = "default_fade")]
+        fade_out: u32,
+    },
     Footnote {
         at: u32,
         dur: u32,
@@ -544,6 +636,10 @@ fn default_note_size() -> f32 {
 
 fn default_note_color() -> String {
     "#5d6f8c".to_string()
+}
+
+fn default_glow_color() -> String {
+    "#f2c98a".to_string()
 }
 
 /// Audio bed specification; everything is synthesized in-process except the

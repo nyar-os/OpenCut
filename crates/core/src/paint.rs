@@ -311,6 +311,12 @@ impl Frame {
         let (sin, cos) = angle.sin_cos();
         let w = self.width as f32;
         let h = self.height as f32;
+        // How many source texels land on one output pixel. Above 1 the frame is
+        // shrinking, so a single bilinear tap would shimmer and alias; average a
+        // small box instead.
+        let ratio = src.width as f32 / (w * zoom);
+        let taps = (ratio.ceil() as u32).clamp(1, 3);
+        let step = ratio / taps as f32;
         for y in 0..self.height {
             let v = (y as f32 + 0.5) / h - 0.5;
             for x in 0..self.width {
@@ -322,7 +328,25 @@ impl Frame {
                 let rv = -zu * sin + zv * cos;
                 let sx = (focus[0] + ru) * src.width as f32 - 0.5;
                 let sy = (focus[1] + rv) * src.height as f32 - 0.5;
-                let texel = src.sample(sx, sy);
+                let texel = if taps == 1 {
+                    src.sample(sx, sy)
+                } else {
+                    let mut acc = [0.0f32; 4];
+                    let half = (taps as f32 - 1.0) / 2.0;
+                    for ty in 0..taps {
+                        for tx in 0..taps {
+                            let t = src.sample(
+                                sx + (tx as f32 - half) * step,
+                                sy + (ty as f32 - half) * step,
+                            );
+                            for k in 0..4 {
+                                acc[k] += t[k];
+                            }
+                        }
+                    }
+                    let n = (taps * taps) as f32;
+                    [acc[0] / n, acc[1] / n, acc[2] / n, acc[3] / n]
+                };
                 let i = ((y * self.width + x) as usize) * 4;
                 self.pixels[i] = texel[0] as u8;
                 self.pixels[i + 1] = texel[1] as u8;

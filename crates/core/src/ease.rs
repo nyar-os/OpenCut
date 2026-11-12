@@ -18,6 +18,37 @@ pub fn apply(ease: Ease, t: f32) -> f32 {
         Ease::OutCubic => 1.0 - (1.0 - t).powi(3),
         Ease::OutQuint => 1.0 - (1.0 - t).powi(5),
         Ease::InOutSine => (1.0 - (std::f32::consts::PI * t).cos()) / 2.0,
+        // Fast take-off, long settle. The curve motion designers reach for on
+        // reveals and camera pushes.
+        Ease::OutExpo => {
+            if t >= 1.0 {
+                1.0
+            } else {
+                1.0 - (-10.0 * t).exp2()
+            }
+        }
+        Ease::InExpo => {
+            if t <= 0.0 {
+                0.0
+            } else {
+                (-10.0 * (1.0 - t)).exp2()
+            }
+        }
+        // Symmetric and calm: reads as a deliberate move rather than a slide.
+        Ease::InOutQuart => {
+            if t < 0.5 {
+                8.0 * t * t * t * t
+            } else {
+                1.0 - (-2.0 * t + 2.0).powi(4) / 2.0
+            }
+        }
+        // Overshoot is a personality, not a default: it belongs on playful
+        // objects and never on type.
+        Ease::OutBack => {
+            const C1: f32 = 1.701_58;
+            const C3: f32 = C1 + 1.0;
+            1.0 + C3 * (t - 1.0).powi(3) + C1 * (t - 1.0).powi(2)
+        }
     }
 }
 

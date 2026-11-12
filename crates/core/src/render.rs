@@ -10,7 +10,7 @@ use crate::encode::Encoder;
 use crate::error::Error;
 use crate::media::MediaLibrary;
 use crate::paint::{Frame, build_vignette, hash, smooth_polyline};
-use crate::scene::{Align, Background, Blend, Item, Project, ShapeKind};
+use crate::scene::{Align, Background, Blend, Item, Project, ShapeKind, camera_at};
 use crate::text::Fonts;
 
 /// Facts about a finished render.
@@ -49,7 +49,13 @@ pub fn render_project(
     let audio_codec = encoder.audio_codec().to_string();
 
     let mut frame = Frame::new(w, h);
-    let mut scratch = Frame::new(w, h);
+    // Rasterize the world at the largest zoom the film uses, so a push-in has
+    // full-resolution detail instead of a blown-up 1:1 frame.
+    let ss = supersample(&project);
+    let mut scratch = Frame::new(
+        (w as f32 * ss).round() as u32,
+        (h as f32 * ss).round() as u32,
+    );
     let total = project.duration_frames;
     let rate = crate::audio::SAMPLE_RATE as usize;
     let mut written_samples = 0usize;
@@ -95,6 +101,21 @@ pub fn render_project(
     })
 }
 
+/// Largest zoom the film asks for, clamped to a sane raster budget. The world
+/// is drawn at this scale so camera pushes never invent pixels.
+fn supersample(project: &Project) -> f32 {
+    let mut max_zoom = 1.0f32;
+    for key in &project.camera {
+        max_zoom = max_zoom.max(key.zoom);
+    }
+    for scene in &project.scenes {
+        if let Some(camera) = &scene.camera {
+            max_zoom = max_zoom.max(camera.zoom_from).max(camera.zoom_to);
+        }
+    }
+    max_zoom.clamp(1.0, 2.0)
+}
+
 fn validate(project: &Project) -> Result<(), Error> {
     if project.width % 2 == 1 || project.height % 2 == 1 {
         return Err(Error::invalid("width and height must be even for H.264"));
@@ -132,6 +153,10 @@ fn paint_frame(
     out: &mut Frame,
 ) {
     out.fill(Rgba([0, 0, 0, 255]));
+    // A global curve gives one continuous move for the whole film; a scene
+    // camera is a per-block move used when no global curve is declared.
+    let global = !project.camera.is_empty();
+    let (global_zoom, global_focus, global_rotate) = camera_at(&project.camera, frame_index);
     let scene = project
         .scenes
         .iter()
@@ -142,12 +167,15 @@ fn paint_frame(
         // With a camera the scene renders off-screen, then that buffer is
         // pushed, pulled or panned into the output frame like a real lens.
         let camera = scene.camera.as_ref();
-        let target: &mut Frame = if camera.is_some() {
+        let offscreen = global || camera.is_some();
+        let target: &mut Frame = if offscreen {
             scratch.fill(Rgba([0, 0, 0, 255]));
             &mut *scratch
         } else {
             &mut *out
         };
+        // The off-screen buffer may be larger than the output so a pushed-in
+        // camera still has real pixels to show instead of an upscale.
         paint_background(target, &scene.background, seconds);
         for item in &scene.items {
             paint_item(
@@ -159,9 +187,16 @@ fn paint_frame(
                 local,
                 frame_index,
                 seconds,
+                global_zoom,
+                1.0,
             );
         }
-        if let Some(camera) = camera {
+        if global {
+            // `zoom` is normalized to the whole world buffer, so the buffer's
+            // own scale cancels out: a 1.62 push samples exactly as many source
+            // pixels as the output needs.
+            out.resample_from(scratch, global_zoom, global_focus, global_rotate);
+        } else if let Some(camera) = camera {
             let t = if scene.duration > 1 {
                 local as f32 / (scene.duration - 1) as f32
             } else {
@@ -228,8 +263,13 @@ fn paint_item(
     local: u32,
     frame_index: u32,
     _seconds: f32,
+    zoom: f32,
+    alpha_mul: f32,
 ) {
-    let (w, h) = (project.width as f32, project.height as f32);
+    // Layout lives in output-relative units. When the world is rasterized
+    // supersampled for a camera push, every pixel measure scales with it.
+    let (fw, fh) = (frame.width as f32, frame.height as f32);
+    let s = fw / project.width as f32;
     match item {
         Item::Text {
             at,
@@ -259,11 +299,12 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
-            let drift = *drift_y * (1.0 - alpha);
+            let drift = *drift_y * s * (1.0 - alpha);
+            let size = *size * s;
             let mut visible = content.as_str();
             if let Some(speed) = typing {
                 let count = ((life as f32 * speed).floor() as usize).min(content.chars().count());
@@ -274,16 +315,16 @@ fn paint_item(
                     .unwrap_or(content.len())];
             }
             let color = parse_or(Some(color), Rgba([230, 238, 250, 255])).with_alpha(alpha);
-            let limit = max_width.map(|m| m * w);
+            let limit = max_width.map(|m| m * fw);
             let lh = line_height.unwrap_or(1.25);
-            let top = px(*y, h as u32) - drift;
+            let top = px(*y, fh as u32) - drift;
             // A reveal rectangle lets text grow out of a shape.
             if let Some(rect) = clip {
                 frame.set_clip([
-                    rect[0] * w,
-                    rect[1] * h,
-                    (rect[0] + rect[2]) * w,
-                    (rect[1] + rect[3]) * h,
+                    rect[0] * fw,
+                    rect[1] * fh,
+                    (rect[0] + rect[2]) * fw,
+                    (rect[1] + rect[3]) * fh,
                 ]);
             }
             let drawn = if *rise > 0.0 {
@@ -292,23 +333,23 @@ fn paint_item(
                 fonts.draw_staggered(
                     frame,
                     visible,
-                    px(*x, w as u32),
+                    px(*x, fw as u32),
                     top,
-                    *size,
+                    size,
                     *bold,
                     color,
                     *align,
                     *stagger,
-                    *rise,
+                    *rise * s,
                     life,
                 )
             } else {
                 fonts.draw_block(
                     frame,
                     visible,
-                    px(*x, w as u32),
+                    px(*x, fw as u32),
                     top,
-                    *size,
+                    size,
                     *bold,
                     color,
                     *align,
@@ -320,9 +361,9 @@ fn paint_item(
                 let gc = parse(glow_color);
                 if let Some(gc) = gc {
                     frame.glow(
-                        px(*x, w as u32),
-                        px(*y, h as u32) - drift + drawn / 2.0,
-                        *size * 2.2,
+                        px(*x, fw as u32),
+                        px(*y, fh as u32) - drift + drawn / 2.0,
+                        size * 2.2,
                         gc.with_alpha(alpha * 0.10),
                     );
                 }
@@ -330,17 +371,17 @@ fn paint_item(
             if let Some(sub_text) = sub {
                 let sub_color = parse_or(sub_color.as_deref(), Rgba([140, 160, 195, 255]))
                     .with_alpha(alpha * 0.9);
-                let sub_size = sub_size.unwrap_or(size * 0.42);
+                let sub_size = sub_size.map(|v| v * s).unwrap_or(size * 0.42);
                 fonts.draw_block(
                     frame,
                     sub_text,
-                    px(*x, w as u32),
-                    px(*y, h as u32) - drift + drawn + sub_size * 0.5,
+                    px(*x, fw as u32),
+                    px(*y, fh as u32) - drift + drawn + sub_size * 0.5,
                     sub_size,
                     false,
                     sub_color,
                     *align,
-                    max_width.map(|m| m * w),
+                    max_width.map(|m| m * fw),
                     1.2,
                 );
             }
@@ -365,11 +406,12 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
             let lh = line_height.unwrap_or(1.5);
+            let size = *size * s;
             let panel_pad = size * 0.9;
             let total_chars: usize = lines.iter().map(|l| l.chars().count()).sum();
             let visible_total = match typing {
@@ -390,11 +432,11 @@ fn paint_item(
             let block_h = revealed as f32 * size * lh + panel_pad * 2.0;
             let widest = lines
                 .iter()
-                .map(|l| fonts.measure(l, *size, false, true))
+                .map(|l| fonts.measure(l, size, false, true))
                 .fold(0.0f32, f32::max);
             let block_w = widest + panel_pad * 2.0;
-            let ox = px(*x, project.width);
-            let oy = px(*y, project.height);
+            let ox = px(*x, fw as u32);
+            let oy = px(*y, fh as u32);
             if let Some(pc) = theme.panel.as_deref().and_then(parse) {
                 frame.round_rect(ox, oy, block_w, block_h, size * 0.6, pc.with_alpha(alpha));
             }
@@ -435,7 +477,7 @@ fn paint_item(
                     line,
                     ox + panel_pad,
                     baseline,
-                    *size,
+                    size,
                     &themed,
                     visible,
                 );
@@ -462,7 +504,7 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
@@ -480,9 +522,9 @@ fn paint_item(
             fonts.draw_block(
                 frame,
                 &text,
-                px(*x, project.width),
-                px(*y, project.height),
-                *size,
+                px(*x, fw as u32),
+                px(*y, fh as u32),
+                *size * s,
                 true,
                 color,
                 Align::Center,
@@ -509,32 +551,32 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
-            let drift = drift_y * (1.0 - alpha);
-            let cx = px(*x, project.width) - px(*w, project.width) / 2.0;
-            let cy = px(*y, project.height) - drift - px(*h, project.height) / 2.0;
-            let cw = px(*w, project.width);
-            let ch = px(*h, project.height);
+            let drift = drift_y * s * (1.0 - alpha);
+            let cx = px(*x, fw as u32) - px(*w, fw as u32) / 2.0;
+            let cy = px(*y, fh as u32) - drift - px(*h, fh as u32) / 2.0;
+            let cw = px(*w, fw as u32);
+            let ch = px(*h, fh as u32);
             let panel_color =
                 parse_or(panel.as_deref(), Rgba([16, 24, 44, 255])).with_alpha(alpha * 0.85);
-            frame.round_rect(cx, cy, cw, ch, 18.0, panel_color);
+            frame.round_rect(cx, cy, cw, ch, 18.0 * s, panel_color);
             let accent_color =
                 parse_or(accent.as_deref(), Rgba([110, 160, 255, 255])).with_alpha(alpha);
-            frame.round_rect(cx, cy, 6.0, ch, 3.0, accent_color);
+            frame.round_rect(cx, cy, 6.0 * s, ch, 3.0 * s, accent_color);
             let title_size = ch * 0.22;
             fonts.draw_block(
                 frame,
                 title,
-                cx + 28.0,
+                cx + 28.0 * s,
                 cy + ch * 0.16,
                 title_size,
                 true,
                 Rgba([235, 242, 252, (alpha * 255.0) as u8]),
                 Align::Left,
-                Some(cw - 56.0),
+                Some(cw - 56.0 * s),
                 1.15,
             );
             if let Some(body) = body {
@@ -542,13 +584,13 @@ fn paint_item(
                 fonts.draw_block(
                     frame,
                     body,
-                    cx + 28.0,
+                    cx + 28.0 * s,
                     cy + ch * 0.44,
                     body_size,
                     false,
                     Rgba([150, 170, 200, (alpha * 255.0) as u8]),
                     Align::Left,
-                    Some(cw - 56.0),
+                    Some(cw - 56.0 * s),
                     1.3,
                 );
             }
@@ -571,7 +613,7 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out) * opacity;
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * opacity * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
@@ -579,16 +621,16 @@ fn paint_item(
             let Ok(bitmap) = media.image(src) else {
                 return;
             };
-            let (bw, bh) = (px(*w, project.width), px(*h, project.height));
+            let (bw, bh) = (px(*w, fw as u32), px(*h, fh as u32));
             frame.draw_bitmap(
                 &bitmap,
-                px(*x, project.width) - bw / 2.0,
-                px(*y, project.height) - bh / 2.0,
+                px(*x, fw as u32) - bw / 2.0,
+                px(*y, fh as u32) - bh / 2.0,
                 bw,
                 bh,
                 *fit,
                 alpha,
-                *radius,
+                *radius * s,
             );
         }
         Item::Video {
@@ -610,7 +652,7 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out) * opacity;
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * opacity * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
@@ -618,16 +660,16 @@ fn paint_item(
             let Ok(bitmap) = media.video_frame(src, source_seconds) else {
                 return;
             };
-            let (bw, bh) = (px(*w, project.width), px(*h, project.height));
+            let (bw, bh) = (px(*w, fw as u32), px(*h, fh as u32));
             frame.draw_bitmap(
                 &bitmap,
-                px(*x, project.width) - bw / 2.0,
-                px(*y, project.height) - bh / 2.0,
+                px(*x, fw as u32) - bw / 2.0,
+                px(*y, fh as u32) - bh / 2.0,
                 bw,
                 bh,
                 *fit,
                 alpha,
-                *radius,
+                *radius * s,
             );
         }
         Item::Shape {
@@ -650,39 +692,38 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
             let c = parse_or(Some(color), Rgba([110, 160, 255, 255])).with_alpha(alpha);
-            let cx = px(*x, project.width);
-            let cy = px(*y, project.height);
+            let cx = px(*x, fw as u32);
+            let cy = px(*y, fh as u32);
             match shape {
-                ShapeKind::Rect => frame.round_rect(
+                ShapeKind::Rect => {
+                    frame.round_rect(cx, cy, px(*w, fw as u32), px(*h, fh as u32), *radius * s, c)
+                }
+                ShapeKind::Circle => frame.circle(cx, cy, px(*w, fw as u32) / 2.0, c, None),
+                ShapeKind::Ring => frame.circle(
                     cx,
                     cy,
-                    px(*w, project.width),
-                    px(*h, project.height),
-                    *radius,
+                    px(*w, fw as u32) / 2.0,
                     c,
+                    stroke.map(|v| v * s).or(Some(3.0 * s)),
                 ),
-                ShapeKind::Circle => frame.circle(cx, cy, px(*w, project.width) / 2.0, c, None),
-                ShapeKind::Ring => {
-                    frame.circle(cx, cy, px(*w, project.width) / 2.0, c, stroke.or(Some(3.0)))
-                }
                 ShapeKind::Line => {
                     // `progress` lets a line draw itself, which is how motion
                     // reads as intent rather than as a slideshow.
                     let p = progress.clamp(0.0, 1.0);
-                    let ex = cx + px(*w, project.width) * p;
-                    let ey = cy + px(*h, project.height) * p;
-                    let thickness = stroke.unwrap_or(2.0);
+                    let ex = cx + px(*w, fw as u32) * p;
+                    let ey = cy + px(*h, fh as u32) * p;
+                    let thickness = stroke.unwrap_or(2.0) * s;
                     match blend {
                         Blend::Normal => frame.line(cx, cy, ex, ey, thickness, c),
                         Blend::Add => {
                             let steps = ((ex - cx).abs().max((ey - cy).abs()) as u32).max(1);
-                            for s in 0..=steps {
-                                let t = s as f32 / steps as f32;
+                            for step in 0..=steps {
+                                let t = step as f32 / steps as f32;
                                 let point = (cx + (ex - cx) * t, cy + (ey - cy) * t);
                                 frame.add_pixel(point.0 as u32, point.1 as u32, c);
                                 frame.add_pixel(point.0 as u32 + 1, point.1 as u32, c);
@@ -711,18 +752,18 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let opacity = fade(life, *dur, *fade_in, *fade_out) * alpha;
+            let opacity = fade(life, *dur, *fade_in, *fade_out) * alpha * alpha_mul;
             if opacity <= 0.001 {
                 return;
             }
             let c = parse_or(Some(color), Rgba([120, 170, 255, 255])).with_alpha(opacity);
-            let height = project.height as f32;
+            let height = fh;
             let seconds = life as f32 / project.fps as f32;
             let count = (*count).max(1);
             for i in 0..count {
                 let base = height * (i as f32 + 1.0) / (count as f32 + 1.0);
                 let drift = seconds * speed * if i % 2 == 0 { 1.0 } else { -0.6 };
-                frame.band(base + drift, *angle, *thickness, c);
+                frame.band(base + drift, *angle, *thickness * s, c);
             }
         }
         Item::Grain {
@@ -737,11 +778,15 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let opacity = fade(life, *dur, *fade_in, *fade_out);
+            let opacity = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if opacity <= 0.001 {
                 return;
             }
-            frame.grain(*density, strength * opacity, frame_index.wrapping_add(1));
+            frame.grain(
+                (*density as f32 * s * s) as u32,
+                strength * opacity,
+                frame_index.wrapping_add(1),
+            );
         }
         Item::Path {
             at,
@@ -763,12 +808,12 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
             let to_pixels = |list: &[[f32; 2]]| -> Vec<[f32; 2]> {
-                list.iter().map(|p| [p[0] * w, p[1] * h]).collect()
+                list.iter().map(|p| [p[0] * fw, p[1] * fh]).collect()
             };
             let mut shape = if *smooth {
                 smooth_polyline(points, *closed, 12)
@@ -791,7 +836,7 @@ fn paint_item(
                     point[0] = cx + dx * cos - dy * sin;
                     point[1] = cy + dx * sin + dy * cos;
                 }
-                shape = px_points.iter().map(|p| [p[0] / w, p[1] / h]).collect();
+                shape = px_points.iter().map(|p| [p[0] / fw, p[1] / fh]).collect();
             }
             let pixels = to_pixels(&shape);
             let additive = *blend == Blend::Add;
@@ -801,14 +846,75 @@ fn paint_item(
             }
             if let Some(width) = stroke {
                 let c = parse_or(Some(color), Rgba([110, 160, 255, 255])).with_alpha(alpha);
-                frame.stroke_polyline(&pixels, *width, c, *progress, additive);
+                frame.stroke_polyline(&pixels, width * s, c, *progress, additive);
                 // A moving tip reads as a pen rather than a static outline.
                 if *progress > 0.01
                     && *progress < 0.999
                     && let Some(tip) = pixels.get((pixels.len() as f32 * progress) as usize)
                 {
-                    frame.glow(tip[0], tip[1], width * 4.0, c);
+                    frame.glow(tip[0], tip[1], width * 4.0 * s, c);
                 }
+            }
+        }
+        Item::Glow {
+            at,
+            dur,
+            x,
+            y,
+            radius,
+            color,
+            intensity,
+            fade_in,
+            fade_out,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            let life = local - *at;
+            let alpha = fade(life, *dur, *fade_in, *fade_out) * intensity * alpha_mul;
+            if alpha <= 0.001 {
+                return;
+            }
+            let c = parse_or(Some(color), Rgba([242, 201, 138, 255])).with_alpha(alpha);
+            frame.glow(
+                px(*x, fw as u32),
+                px(*y, fh as u32),
+                px(*radius, fw as u32) * s,
+                c,
+            );
+        }
+        Item::Layer {
+            at,
+            dur,
+            zoom_from,
+            zoom_to,
+            edge,
+            items,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            // Layers hand off by zoom instead of by cut: while the camera keeps
+            // moving, the layer that no longer owns this scale fades out and the
+            // next one fades in. That is what makes a continuous take possible.
+            let weight = layer_weight(zoom, *zoom_from, *zoom_to, *edge);
+            if weight <= 0.001 {
+                return;
+            }
+            let local_life = local - *at;
+            for child in items {
+                paint_item(
+                    project,
+                    fonts,
+                    media,
+                    frame,
+                    child,
+                    local_life,
+                    frame_index,
+                    _seconds,
+                    zoom,
+                    alpha_mul * weight,
+                );
             }
         }
         Item::Footnote {
@@ -835,13 +941,13 @@ fn paint_item(
             fonts.draw_block(
                 frame,
                 text,
-                px(*x, project.width),
-                px(*y, project.height),
-                *size,
+                px(*x, fw as u32),
+                px(*y, fh as u32),
+                *size * s,
                 false,
                 c,
                 *align,
-                Some(0.6 * project.width as f32),
+                Some(0.6 * fw),
                 1.2,
             );
         }
@@ -856,20 +962,31 @@ fn paint_item(
                 return;
             }
             let life = local - *at;
-            let alpha = fade(life, *dur, 6, 6);
+            let alpha = fade(life, *dur, 6, 6) * alpha_mul;
             if alpha <= 0.001 {
                 return;
             }
             let track = parse_or(track.as_deref(), Rgba([40, 52, 78, 255])).with_alpha(alpha * 0.7);
             let fill = parse_or(fill.as_deref(), Rgba([110, 160, 255, 255])).with_alpha(alpha);
-            let bar_y = px(y.unwrap_or(0.965), project.height);
-            let margin = 0.08 * project.width as f32;
-            let full = project.width as f32 - margin * 2.0;
-            frame.round_rect(margin, bar_y, full, 4.0, 2.0, track);
+            let bar_y = px(y.unwrap_or(0.965), fh as u32);
+            let margin = 0.08 * fw;
+            let full = fw - margin * 2.0;
+            frame.round_rect(margin, bar_y, full, 4.0 * s, 2.0 * s, track);
             let t = frame_index as f32 / project.duration_frames as f32;
-            frame.round_rect(margin, bar_y, full * t, 4.0, 2.0, fill);
+            frame.round_rect(margin, bar_y, full * t, 4.0 * s, 2.0 * s, fill);
         }
     }
+}
+
+/// Opacity of a layer at a given camera zoom: 1 inside the window, easing to 0
+/// across `edge` outside it. Windows that overlap cross-fade.
+fn layer_weight(zoom: f32, from: f32, to: f32, edge: f32) -> f32 {
+    let edge = edge.max(0.0001);
+    let fade_in = ((zoom - (from - edge)) / edge).clamp(0.0, 1.0);
+    let fade_out = (((to + edge) - zoom) / edge).clamp(0.0, 1.0);
+    // Smoothstep on both ends avoids a visible start or stop.
+    let ease = |t: f32| t * t * (3.0 - 2.0 * t);
+    ease(fade_in) * ease(fade_out)
 }
 
 /// Deterministic jitter helper kept for future item kinds.
@@ -914,6 +1031,39 @@ mod tests {
         assert!(stats.audio);
         let meta = std::fs::metadata(&out).expect("output exists");
         assert!(meta.len() > 1_000, "mp4 too small: {}", meta.len());
+    }
+
+    /// A film-wide camera curve with zoom-gated layers and a soft light: the
+    /// one-take path must compile, render and move the frame without cutting.
+    #[test]
+    fn renders_one_take_camera() {
+        let project = serde_json::json!({
+            "width": 320, "height": 240, "fps": 15, "durationFrames": 30,
+            "scenes": [{
+                "start": 0, "duration": 30,
+                "background": { "kind": "solid", "color": "#05070f" },
+                "items": [{
+                    "kind": "layer", "at": 0, "dur": 30, "zoomFrom": 0.9, "zoomTo": 2.0,
+                    "items": [
+                        { "kind": "glow", "at": 0, "dur": 30, "x": 0.5, "y": 0.5,
+                          "radius": 0.2, "color": "#ffcc88", "intensity": 1.0 },
+                        { "kind": "path", "at": 0, "dur": 30,
+                          "points": [[0.0, 0.8], [0.5, 0.6], [1.0, 0.8]],
+                          "smooth": true, "stroke": 3.0, "color": "#7aa2ff" }
+                    ]
+                }]
+            }],
+            "camera": [
+                { "at": 0, "zoom": 1.6, "focus": [0.5, 0.5] },
+                { "at": 29, "zoom": 1.0, "focus": [0.5, 0.5], "ease": "in-out-quart" }
+            ],
+            "audio": null
+        });
+        let out = std::env::temp_dir().join("opencut-one-take.mp4");
+        let stats =
+            super::render_project(&project.to_string(), &out, &mut |_, _| {}).expect("render");
+        assert_eq!(stats.frames, 30);
+        assert!(std::fs::metadata(&out).unwrap().len() > 1_000);
     }
 
     #[test]
