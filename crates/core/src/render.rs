@@ -9,7 +9,7 @@ use crate::ease::{apply, fade};
 use crate::encode::Encoder;
 use crate::error::Error;
 use crate::media::MediaLibrary;
-use crate::paint::{Frame, build_vignette, hash};
+use crate::paint::{Frame, build_vignette, hash, smooth_polyline};
 use crate::scene::{Align, Background, Blend, Item, Project, ShapeKind};
 use crate::text::Fonts;
 
@@ -253,6 +253,7 @@ fn paint_item(
             glow,
             stagger,
             rise,
+            clip,
         } => {
             if local < *at || local >= *at + *dur {
                 return;
@@ -276,6 +277,15 @@ fn paint_item(
             let limit = max_width.map(|m| m * w);
             let lh = line_height.unwrap_or(1.25);
             let top = px(*y, h as u32) - drift;
+            // A reveal rectangle lets text grow out of a shape.
+            if let Some(rect) = clip {
+                frame.set_clip([
+                    rect[0] * w,
+                    rect[1] * h,
+                    (rect[0] + rect[2]) * w,
+                    (rect[1] + rect[3]) * h,
+                ]);
+            }
             let drawn = if *rise > 0.0 {
                 // Character-by-character entrance reads as motion, not as a
                 // block of text fading in.
@@ -333,6 +343,9 @@ fn paint_item(
                     max_width.map(|m| m * w),
                     1.2,
                 );
+            }
+            if clip.is_some() {
+                frame.clear_clip();
             }
         }
         Item::Code {
@@ -729,6 +742,74 @@ fn paint_item(
                 return;
             }
             frame.grain(*density, strength * opacity, frame_index.wrapping_add(1));
+        }
+        Item::Path {
+            at,
+            dur,
+            points,
+            smooth,
+            closed,
+            fill,
+            color,
+            stroke,
+            progress,
+            rotate,
+            scale,
+            blend,
+            fade_in,
+            fade_out,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            let life = local - *at;
+            let alpha = fade(life, *dur, *fade_in, *fade_out);
+            if alpha <= 0.001 {
+                return;
+            }
+            let to_pixels = |list: &[[f32; 2]]| -> Vec<[f32; 2]> {
+                list.iter().map(|p| [p[0] * w, p[1] * h]).collect()
+            };
+            let mut shape = if *smooth {
+                smooth_polyline(points, *closed, 12)
+            } else {
+                points.clone()
+            };
+            if *closed && !*smooth && !shape.is_empty() {
+                shape.push(shape[0]);
+            }
+            // Per-item transform: scale, then rotate, around the centroid.
+            if (*scale - 1.0).abs() > 0.001 || rotate.abs() > 0.001 {
+                let mut px_points = to_pixels(&shape);
+                let count = px_points.len().max(1) as f32;
+                let cx = px_points.iter().map(|p| p[0]).sum::<f32>() / count;
+                let cy = px_points.iter().map(|p| p[1]).sum::<f32>() / count;
+                let (sin, cos) = rotate.to_radians().sin_cos();
+                for point in &mut px_points {
+                    let dx = (point[0] - cx) * scale;
+                    let dy = (point[1] - cy) * scale;
+                    point[0] = cx + dx * cos - dy * sin;
+                    point[1] = cy + dx * sin + dy * cos;
+                }
+                shape = px_points.iter().map(|p| [p[0] / w, p[1] / h]).collect();
+            }
+            let pixels = to_pixels(&shape);
+            let additive = *blend == Blend::Add;
+            if let Some(fill_color) = fill {
+                let c = parse_or(Some(fill_color), Rgba([20, 40, 90, 255])).with_alpha(alpha);
+                frame.fill_polygon(&pixels, c, additive);
+            }
+            if let Some(width) = stroke {
+                let c = parse_or(Some(color), Rgba([110, 160, 255, 255])).with_alpha(alpha);
+                frame.stroke_polyline(&pixels, *width, c, *progress, additive);
+                // A moving tip reads as a pen rather than a static outline.
+                if *progress > 0.01
+                    && *progress < 0.999
+                    && let Some(tip) = pixels.get((pixels.len() as f32 * progress) as usize)
+                {
+                    frame.glow(tip[0], tip[1], width * 4.0, c);
+                }
+            }
         }
         Item::Footnote {
             at,

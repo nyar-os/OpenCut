@@ -142,7 +142,24 @@ export type Item =
           fadeIn?: number;
           fadeOut?: number;
       }
-    | { kind: 'progress'; at: number; dur: number; track?: string | null; fill?: string | null; y?: number | null };
+    | { kind: 'progress'; at: number; dur: number; track?: string | null; fill?: string | null; y?: number | null }
+    | {
+          kind: 'path';
+          at: number;
+          dur: number;
+          points: Array<[number, number]>;
+          smooth?: boolean;
+          closed?: boolean;
+          fill?: string | null;
+          color: string;
+          stroke?: number | null;
+          progress?: number;
+          rotate?: number;
+          scale?: number;
+          blend?: 'normal' | 'add';
+          fadeIn?: number;
+          fadeOut?: number;
+      };
 
 export interface BgmSpec {
     volume?: number;

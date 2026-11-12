@@ -177,6 +177,8 @@ export interface TextOptions {
     rise?: number;
     /** Frames between two glyphs entering. */
     stagger?: number;
+    /** Reveal rectangle [x, y, w, h] in normalized coords; glyphs paint only inside. */
+    clip?: [number, number, number, number];
 }
 
 export function text(options: TextOptions): ItemInput {
@@ -283,6 +285,36 @@ export function bands(options: {
 /** Deterministic film grain, refreshed every frame. */
 export function grain(options: { at?: number; dur?: number; strength?: number; density?: number; fadeIn?: number; fadeOut?: number } = {}): ItemInput {
     return { kind: 'grain', strength: 0.05, density: 9000, dur: options.dur ?? 4, ...options } as ItemInput;
+}
+
+export interface PathOptions {
+    at?: number;
+    dur?: number;
+    /** Control points in normalized frame coordinates. */
+    points: Array<[number, number]>;
+    /** Treat the points as a smooth curve instead of a polyline. */
+    smooth?: boolean;
+    closed?: boolean;
+    fill?: string;
+    /** Stroke color. */
+    color?: string;
+    stroke?: number;
+    /** Fraction of the outline drawn. */
+    progress?: number;
+    /** Degrees, around the path centroid. */
+    rotate?: number;
+    scale?: number;
+    blend?: 'normal' | 'add';
+    fadeIn?: number;
+    fadeOut?: number;
+}
+
+/**
+ * A free path: fill it for shapes and silhouettes, stroke it for lines and
+ * charts, and animate `progress` to make it draw itself.
+ */
+export function path(options: PathOptions): ItemInput {
+    return { kind: 'path', color: '#7aa2ff', stroke: 3, progress: 1, scale: 1, rotate: 0, dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
 export interface FootnoteOptions {

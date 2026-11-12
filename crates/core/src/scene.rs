@@ -311,6 +311,10 @@ pub enum Item {
         /// Pixels each glyph rises from, when `stagger` > 0.
         #[serde(default)]
         rise: f32,
+        /// Reveal rectangle in normalized coordinates: glyphs only paint inside
+        /// it. Used for text that grows out of a shape.
+        #[serde(default)]
+        clip: Option<[f32; 4]>,
     },
     Code {
         at: u32,
@@ -426,6 +430,38 @@ pub enum Item {
         strength: f32,
         #[serde(default = "default_grain_density")]
         density: u32,
+        #[serde(default = "default_fade")]
+        fade_in: u32,
+        #[serde(default = "default_fade")]
+        fade_out: u32,
+    },
+    /// A filled and/or stroked path. Points are normalized frame coordinates.
+    Path {
+        at: u32,
+        dur: u32,
+        points: Vec<[f32; 2]>,
+        /// Treat the points as a smooth Catmull-Rom curve instead of a polyline.
+        #[serde(default)]
+        smooth: bool,
+        #[serde(default)]
+        closed: bool,
+        #[serde(default)]
+        fill: Option<String>,
+        /// Stroke color.
+        color: String,
+        #[serde(default)]
+        stroke: Option<f32>,
+        /// Fraction of the outline drawn, for a path that draws itself.
+        #[serde(default = "default_one_f32")]
+        progress: f32,
+        /// Rotation in degrees around the path centroid.
+        #[serde(default)]
+        rotate: f32,
+        /// Scale around the path centroid.
+        #[serde(default = "default_one_f32")]
+        scale: f32,
+        #[serde(default)]
+        blend: Blend,
         #[serde(default = "default_fade")]
         fade_in: u32,
         #[serde(default = "default_fade")]

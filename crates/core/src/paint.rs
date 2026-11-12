@@ -399,6 +399,152 @@ impl Frame {
         }
     }
 
+    /// Fills a closed polygon with 4x vertical supersampling for soft edges.
+    ///
+    /// Coverage is accumulated per pixel and composited once, so a solid fill
+    /// stays solid instead of stacking four translucent passes.
+    pub fn fill_polygon(&mut self, points: &[[f32; 2]], c: Rgba, additive: bool) {
+        if points.len() < 3 || c.0[3] == 0 {
+            return;
+        }
+        let min_y = points
+            .iter()
+            .map(|p| p[1])
+            .fold(f32::INFINITY, f32::min)
+            .max(0.0);
+        let max_y = points
+            .iter()
+            .map(|p| p[1])
+            .fold(f32::NEG_INFINITY, f32::max)
+            .min(self.height as f32 - 1.0);
+        if max_y <= min_y {
+            return;
+        }
+        let samples = 4u32;
+        let mut xs: Vec<f32> = Vec::with_capacity(16);
+        let mut coverage = vec![0u8; self.width as usize];
+        for row in min_y.floor() as u32..=max_y.ceil() as u32 {
+            if row >= self.height {
+                break;
+            }
+            coverage.fill(0);
+            for s in 0..samples {
+                let y = row as f32 + (s as f32 + 0.5) / samples as f32;
+                xs.clear();
+                for i in 0..points.len() {
+                    let a = points[i];
+                    let b = points[(i + 1) % points.len()];
+                    if (a[1] <= y) == (b[1] <= y) {
+                        continue;
+                    }
+                    let t = (y - a[1]) / (b[1] - a[1]);
+                    xs.push(a[0] + (b[0] - a[0]) * t);
+                }
+                if xs.is_empty() {
+                    continue;
+                }
+                xs.sort_by(|p, q| p.partial_cmp(q).unwrap_or(std::cmp::Ordering::Equal));
+                // Even-odd rule: fill between consecutive crossings.
+                for pair in xs.as_chunks::<2>().0 {
+                    let (x0, x1) = (pair[0], pair[1]);
+                    if x1 <= x0 {
+                        continue;
+                    }
+                    let start = x0.max(0.0) as u32;
+                    let end = x1.min(self.width as f32 - 1.0) as u32;
+                    for px in start..=end {
+                        coverage[px as usize] = coverage[px as usize].saturating_add(1);
+                    }
+                }
+            }
+            for px in 0..self.width {
+                let covered = coverage[px as usize];
+                if covered == 0 {
+                    continue;
+                }
+                let alpha = c.0[3] as f32 * covered as f32 / samples as f32;
+                if alpha < 1.0 {
+                    continue;
+                }
+                let color = Rgba([c.0[0], c.0[1], c.0[2], alpha as u8]);
+                if additive {
+                    self.add_pixel(px, row, color);
+                } else {
+                    self.blend(px, row, color);
+                }
+            }
+        }
+    }
+
+    /// Strokes a polyline, optionally only the first `progress` of its length.
+    pub fn stroke_polyline(
+        &mut self,
+        points: &[[f32; 2]],
+        width: f32,
+        c: Rgba,
+        progress: f32,
+        additive: bool,
+    ) {
+        if points.len() < 2 {
+            return;
+        }
+        let progress = progress.clamp(0.0, 1.0);
+        let mut total = 0.0f32;
+        for i in 1..points.len() {
+            total += distance(points[i - 1], points[i]);
+        }
+        if total <= 0.0 {
+            return;
+        }
+        let limit = total * progress;
+        let mut walked = 0.0f32;
+        let half = (width / 2.0).max(0.5);
+        for i in 1..points.len() {
+            let (a, b) = (points[i - 1], points[i]);
+            let segment = distance(a, b);
+            if segment <= 0.0001 {
+                continue;
+            }
+            let usable = (limit - walked).min(segment);
+            if usable <= 0.0 {
+                break;
+            }
+            let t = usable / segment;
+            let end = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+            let steps = (usable * 1.5).max(2.0) as u32;
+            for s in 0..=steps {
+                let f = s as f32 / steps as f32;
+                let px = a[0] + (end[0] - a[0]) * f;
+                let py = a[1] + (end[1] - a[1]) * f;
+                self.stamp_disc(px, py, half, c, additive);
+            }
+            walked += usable;
+            if walked >= limit {
+                break;
+            }
+        }
+    }
+
+    fn stamp_disc(&mut self, cx: f32, cy: f32, radius: f32, c: Rgba, additive: bool) {
+        let x0 = (cx - radius).max(0.0) as u32;
+        let y0 = (cy - radius).max(0.0) as u32;
+        let x1 = (cx + radius).min(self.width as f32 - 1.0) as u32;
+        let y1 = (cy + radius).min(self.height as f32 - 1.0) as u32;
+        for py in y0..=y1 {
+            for px in x0..=x1 {
+                let dx = px as f32 - cx;
+                let dy = py as f32 - cy;
+                if dx * dx + dy * dy <= radius * radius {
+                    if additive {
+                        self.add_pixel(px, py, c);
+                    } else {
+                        self.blend(px, py, c);
+                    }
+                }
+            }
+        }
+    }
+
     /// Ring or disc.
     pub fn circle(&mut self, cx: f32, cy: f32, radius: f32, c: Rgba, stroke: Option<f32>) {
         let r = radius;
@@ -636,6 +782,61 @@ pub fn hash(mut x: u32) -> u32 {
     x ^= x >> 17;
     x ^= x << 5;
     x.wrapping_mul(0x9e37_79b9)
+}
+
+/// Euclidean distance between two points.
+#[must_use]
+pub fn distance(a: [f32; 2], b: [f32; 2]) -> f32 {
+    let dx = b[0] - a[0];
+    let dy = b[1] - a[1];
+    (dx * dx + dy * dy).sqrt()
+}
+
+/// Resamples a polyline as a Catmull-Rom curve, so a handful of control points
+/// becomes a drawn line. `segments` is the resolution between two points.
+#[must_use]
+pub fn smooth_polyline(points: &[[f32; 2]], closed: bool, segments: u32) -> Vec<[f32; 2]> {
+    if points.len() < 2 {
+        return points.to_vec();
+    }
+    let count = points.len();
+    let at = |i: isize| -> [f32; 2] {
+        let index = if closed {
+            ((i % count as isize) + count as isize) % count as isize
+        } else {
+            i.clamp(0, count as isize - 1)
+        };
+        points[index as usize]
+    };
+    let mut out = Vec::with_capacity(count * segments as usize + 1);
+    let last = if closed {
+        count as isize
+    } else {
+        count as isize - 1
+    };
+    for i in 0..last {
+        let (p0, p1, p2, p3) = (at(i - 1), at(i), at(i + 1), at(i + 2));
+        for s in 0..segments {
+            let t = s as f32 / segments as f32;
+            let t2 = t * t;
+            let t3 = t2 * t;
+            let mut point = [0.0f32; 2];
+            for k in 0..2 {
+                point[k] = 0.5
+                    * ((2.0 * p1[k])
+                        + (-p0[k] + p2[k]) * t
+                        + (2.0 * p0[k] - 5.0 * p1[k] + 4.0 * p2[k] - p3[k]) * t2
+                        + (-p0[k] + 3.0 * p1[k] - 3.0 * p2[k] + p3[k]) * t3);
+            }
+            out.push(point);
+        }
+    }
+    if closed {
+        out.push(out[0]);
+    } else {
+        out.push(points[count - 1]);
+    }
+    out
 }
 
 /// Builds the vignette factor map once per resolution.
