@@ -1,0 +1,23 @@
+{
+    "name": "@wae/open-cut-workspace",
+    "private": true,
+    "type": "module",
+    "packageManager": "pnpm@10.28.0",
+    "description": "OpenCut workspace (crates = Rust, packages = TypeScript)",
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/nyar-os/OpenCut.git"
+    },
+    "scripts": {
+        "build:napi": "node --experimental-strip-types scripts/build-napi.ts",
+        "build:ts": "pnpm --filter @wae/open-cut run build",
+        "build": "pnpm run build:napi && pnpm run build:ts",
+        "stage:native": "node --experimental-strip-types scripts/stage-native.ts",
+        "render:demo": "pnpm run build && node --experimental-strip-types films/demo.ts"
+    },
+    "devDependencies": {
+        "@types/node": "^22.20.4",
+        "typescript": "^5.9.2"
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "name": "@wae/open-cut-win32-x64",
+    "version": "0.0.1",
+    "description": "OpenCut native addon for Windows x64",
+    "license": "Apache-2.0",
+    "os": ["win32"],
+    "cpu": ["x64"],
+    "main": "./open-cut.win32-x64.node",
+    "files": [
+        "open-cut.win32-x64.node",
+        "README.md",
+        "License.md"
+    ]
+}

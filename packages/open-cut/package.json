@@ -1,0 +1,48 @@
+{
+    "name": "@wae/open-cut",
+    "version": "0.0.1",
+    "description": "OpenCut code-first video editor: TypeScript DSL, Node API and `open-cut` CLI",
+    "license": "Apache-2.0",
+    "type": "module",
+    "bin": {
+        "open-cut": "dist/cli.js"
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "README.md",
+        "License.md"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "typecheck": "tsc -p tsconfig.json --noEmit"
+    },
+    "keywords": [
+        "open-cut",
+        "video-editor",
+        "code-first",
+        "wae"
+    ],
+    "engines": {
+        "node": ">=18"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/nyar-os/OpenCut.git",
+        "directory": "packages/open-cut"
+    },
+    "optionalDependencies": {
+        "@wae/open-cut-win32-x64": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^22.20.4",
+        "typescript": "^5.9.2"
+    }
+}

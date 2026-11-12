@@ -1,0 +1,8 @@
+target/
+node_modules/
+dist/
+.cache/
+*.node
+*.log
+.DS_Store
+.idea/
