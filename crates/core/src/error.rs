@@ -15,25 +15,37 @@ impl Error {
     /// Scene description failed validation or parsing.
     #[must_use]
     pub fn invalid(message: impl Into<String>) -> Self {
-        Self { code: "invalid_scene", message: message.into() }
+        Self {
+            code: "invalid_scene",
+            message: message.into(),
+        }
     }
 
     /// An I/O step (fonts, output file) failed.
     #[must_use]
     pub fn io(message: impl Into<String>) -> Self {
-        Self { code: "io", message: message.into() }
+        Self {
+            code: "io",
+            message: message.into(),
+        }
     }
 
     /// The encoder backend failed.
     #[must_use]
     pub fn encode(message: impl Into<String>) -> Self {
-        Self { code: "encode", message: message.into() }
+        Self {
+            code: "encode",
+            message: message.into(),
+        }
     }
 
     /// A capability is not implemented on this platform.
     #[must_use]
     pub fn unsupported(message: impl Into<String>) -> Self {
-        Self { code: "unsupported_platform", message: message.into() }
+        Self {
+            code: "unsupported_platform",
+            message: message.into(),
+        }
     }
 
     /// The stable code for hosts.
