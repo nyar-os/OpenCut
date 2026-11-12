@@ -3,6 +3,7 @@ node_modules/
 dist/
 .cache/
 *.node
+*.mp4
 *.log
 .DS_Store
 .idea/

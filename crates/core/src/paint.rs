@@ -59,7 +59,7 @@ impl Frame {
 
     /// Paints a solid color everywhere.
     pub fn fill(&mut self, c: Rgba) {
-        for chunk in self.pixels.chunks_exact_mut(4) {
+        for chunk in self.pixels.chunks_mut(4) {
             chunk.copy_from_slice(&c.0);
         }
     }
@@ -82,7 +82,7 @@ impl Frame {
             let local = t - seg as f32;
             let c = stops[seg].lerp(stops[seg + 1], local);
             let row = (y as usize) * (w as usize) * 4;
-            for px in self.pixels[row..row + (w as usize) * 4].chunks_exact_mut(4) {
+            for px in self.pixels[row..row + (w as usize) * 4].chunks_mut(4) {
                 px.copy_from_slice(&c.0);
             }
         }

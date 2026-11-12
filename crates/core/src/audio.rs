@@ -69,9 +69,9 @@ fn synth_pad(buf: &mut [f32], volume: f32) {
         let env = (phase_in_chord * std::f64::consts::PI).sin().powf(0.6);
         let mut s = 0.0f64;
         for f in chord {
-            let w = *f as f64 * t * std::f64::consts::TAU;
+            let w = *f * t * std::f64::consts::TAU;
             s += w.sin() * 0.5 + (w * 2.0).sin() * 0.12;
-            let detuned = (*f as f64 * 1.003) * t * std::f64::consts::TAU;
+            let detuned = (*f * 1.003) * t * std::f64::consts::TAU;
             s += detuned.sin() * 0.35;
         }
         let value = (s / (chord.len() as f64 * 1.2)) * env * volume as f64;
@@ -245,8 +245,8 @@ pub fn write_wav(path: &str, samples: &[i16]) -> Result<(), Error> {
     out.extend_from_slice(&16u32.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes());
     out.extend_from_slice(&2u16.to_le_bytes());
-    out.extend_from_slice(&(SAMPLE_RATE as u32).to_le_bytes());
-    out.extend_from_slice(&(SAMPLE_RATE as u32 * 4).to_le_bytes());
+    out.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
+    out.extend_from_slice(&(SAMPLE_RATE * 4).to_le_bytes());
     out.extend_from_slice(&4u16.to_le_bytes());
     out.extend_from_slice(&16u16.to_le_bytes());
     out.extend_from_slice(b"data");

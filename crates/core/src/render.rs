@@ -9,7 +9,7 @@ use crate::ease::{apply, fade};
 use crate::encode::Encoder;
 use crate::error::Error;
 use crate::paint::{Frame, build_vignette, hash};
-use crate::scene::{Align, Background, Ease, Item, Project, ShapeKind};
+use crate::scene::{Align, Background, Item, Project, ShapeKind};
 use crate::text::Fonts;
 
 /// Facts about a finished render.
@@ -291,7 +291,23 @@ fn paint_item(
             }
             let lh = line_height.unwrap_or(1.5);
             let panel_pad = size * 0.9;
-            let block_h = lines.len() as f32 * size * lh + panel_pad * 2.0;
+            let total_chars: usize = lines.iter().map(|l| l.chars().count()).sum();
+            let visible_total = match typing {
+                Some(speed) => (life as f32 * speed).floor() as usize,
+                None => total_chars,
+            };
+            // The panel grows with the typewriter so it never looks pre-filled.
+            let mut revealed = 0usize;
+            let mut budget = visible_total;
+            for line in lines {
+                if budget == 0 {
+                    break;
+                }
+                budget = budget.saturating_sub(line.chars().count());
+                revealed += 1;
+            }
+            let revealed = revealed.max(1);
+            let block_h = revealed as f32 * size * lh + panel_pad * 2.0;
             let widest = lines
                 .iter()
                 .map(|l| fonts.measure(l, *size, false, true))
@@ -299,10 +315,8 @@ fn paint_item(
             let block_w = widest + panel_pad * 2.0;
             let ox = px(*x, project.width);
             let oy = px(*y, project.height);
-            if let Some(panel) = &theme.panel {
-                if let Some(pc) = parse(panel) {
-                    frame.round_rect(ox, oy, block_w, block_h, size * 0.6, pc.with_alpha(alpha));
-                }
+            if let Some(pc) = theme.panel.as_deref().and_then(parse) {
+                frame.round_rect(ox, oy, block_w, block_h, size * 0.6, pc.with_alpha(alpha));
             }
             let total_chars: usize = lines.iter().map(|l| l.chars().count()).sum();
             let visible_total = match typing {
@@ -311,6 +325,9 @@ fn paint_item(
             };
             let mut used = 0usize;
             for (i, line) in lines.iter().enumerate() {
+                if used >= visible_total && typing.is_some() {
+                    break;
+                }
                 let baseline = oy + panel_pad + size * 0.82 + i as f32 * size * lh;
                 let remain = visible_total.saturating_sub(used);
                 let visible = if remain >= line.chars().count() {

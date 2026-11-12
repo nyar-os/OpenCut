@@ -22,12 +22,17 @@ fn version(ctx: CallContext) -> Result<JsValue> {
 /// Rendering is synchronous on the calling thread and logs progress to stdout.
 #[function(js_name = "renderProject")]
 fn render_project(ctx: CallContext) -> Result<JsValue> {
-    let arg = ctx.args().first().copied().ok_or_else(|| Error::new("renderProject requires an options object"))?;
+    let arg = ctx
+        .args()
+        .first()
+        .copied()
+        .ok_or_else(|| Error::new("renderProject requires an options object"))?;
     let project = arg.get_named("project")?.as_string()?;
     let out = arg.get_named("out")?.as_string()?;
     let path = std::path::Path::new(&out);
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-        std::fs::create_dir_all(parent).map_err(|e| Error::new(format!("cannot create output directory: {e}")))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| Error::new(format!("cannot create output directory: {e}")))?;
     }
     let stats = opencut_core::render::render_project(&project, path, &mut |done, total| {
         if done == total || done % 30 == 0 {
@@ -63,11 +68,10 @@ fn json_to_js(env: Env, value: &serde_json::Value) -> Result<JsValue> {
         serde_json::Value::Number(number) => {
             if let Some(integer) = number.as_i64() {
                 env.int64(integer)
-            }
-            else {
+            } else {
                 env.double(number.as_f64().unwrap_or(0.0))
             }
-        },
+        }
         serde_json::Value::String(text) => env.string(text),
         serde_json::Value::Array(items) => {
             let array = env.array_with_length(items.len())?;
@@ -75,14 +79,14 @@ fn json_to_js(env: Env, value: &serde_json::Value) -> Result<JsValue> {
                 array.set_element(index as u32, json_to_js(env, item)?)?;
             }
             Ok(array)
-        },
+        }
         serde_json::Value::Object(map) => {
             let object = env.object()?;
             for (key, item) in map {
                 object.set_named(key, json_to_js(env, item)?)?;
             }
             Ok(object)
-        },
+        }
     }
 }
 

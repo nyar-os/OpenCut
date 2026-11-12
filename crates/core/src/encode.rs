@@ -181,9 +181,7 @@ mod windows_encoder {
             };
             let mut last_error = None;
             for (subtype, name) in candidates {
-                match Self::try_open(
-                    out, width, height, fps, bitrate, with_audio, *subtype, *name,
-                ) {
+                match Self::try_open(out, width, height, fps, bitrate, with_audio, subtype, name) {
                     Ok(encoder) => return Ok(encoder),
                     Err(error) => last_error = Some(error),
                 }

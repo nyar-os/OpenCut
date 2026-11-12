@@ -35,8 +35,11 @@ pub struct Fonts {
     regular: Font,
     bold: Font,
     mono: Font,
-    cache: HashMap<(FontId, char, u32), (f32, f32, f32, f32, f32, Vec<u8>)>,
+    cache: HashMap<(FontId, char, u32), CachedGlyph>,
 }
+
+/// One rasterized glyph: advance, x offset, top offset, size, coverage.
+type CachedGlyph = (f32, f32, f32, f32, f32, Vec<u8>);
 
 struct Glyph {
     advance: f32,
@@ -65,9 +68,9 @@ impl Fonts {
             collection_index: 0,
             ..Default::default()
         };
-        let regular = Font::from_bytes(pick(REGULAR)?, settings.clone())
+        let regular = Font::from_bytes(pick(REGULAR)?, settings)
             .map_err(|e| crate::error::Error::io(format!("regular font: {e}")))?;
-        let bold = Font::from_bytes(pick(BOLD)?, settings.clone())
+        let bold = Font::from_bytes(pick(BOLD)?, settings)
             .map_err(|e| crate::error::Error::io(format!("bold font: {e}")))?;
         let mono = Font::from_bytes(pick(MONO)?, settings)
             .map_err(|e| crate::error::Error::io(format!("mono font: {e}")))?;
@@ -87,7 +90,18 @@ impl Fonts {
         }
     }
 
+    /// Resolves the font that can actually draw `ch`: the mono face has no CJK
+    /// coverage, so those characters fall back to the regular face.
+    fn resolve(&self, id: FontId, ch: char) -> FontId {
+        if id == FontId::Mono && !self.mono.has_glyph(ch) && self.regular.has_glyph(ch) {
+            FontId::Regular
+        } else {
+            id
+        }
+    }
+
     fn glyph(&mut self, id: FontId, ch: char, size: f32) -> Glyph {
+        let id = self.resolve(id, ch);
         let key = (id, ch, (size * 4.0) as u32);
         if let Some(hit) = self.cache.get(&key) {
             return Glyph {
@@ -100,16 +114,17 @@ impl Fonts {
             };
         }
         let font = self.font(id);
-        let metrics = font.metrics(ch, size);
-        let (raster, bitmap) = font.rasterize(ch, size);
-        let top_from_baseline = raster.bounds.ymin + raster.bounds.height;
+        let (metrics, bitmap) = font.rasterize(ch, size);
+        // `metrics.width`/`height` are the bitmap size in whole pixels and are
+        // exactly the row stride fontdue packs; `bounds` is only the ink box.
+        let top_from_baseline = (metrics.ymin + metrics.height as i32) as f32;
         let entry = (
             metrics.advance_width,
-            raster.bounds.xmin,
+            metrics.xmin as f32,
             top_from_baseline,
-            raster.bounds.width,
-            raster.bounds.height,
-            bitmap.to_vec(),
+            metrics.width as f32,
+            metrics.height as f32,
+            bitmap,
         );
         self.cache.insert(key, entry.clone());
         Glyph {
@@ -378,7 +393,7 @@ fn highlight(line: &str) -> Vec<(String, Tone)> {
     let chars: Vec<char> = rest.chars().collect();
     let mut i = 0usize;
     let mut plain = String::new();
-    let mut flush = |plain: &mut String, out: &mut Vec<(String, Tone)>| {
+    let flush = |plain: &mut String, out: &mut Vec<(String, Tone)>| {
         if !plain.is_empty() {
             out.push((std::mem::take(plain), Tone::Plain));
         }

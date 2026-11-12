@@ -65,9 +65,19 @@ export class Film {
         return this;
     }
 
-    /** Sets the audio bed. Narration is a reserved slot: point it at a PCM WAV. */
-    audio(spec: AudioSpec): this {
-        this.audioSpec = spec;
+    /** Sets the audio bed. `sfx.at` and narration delay are in seconds here;
+     *  the compiler converts them to frames for the IR. Narration is a
+     *  reserved slot: point it at a PCM WAV. */
+    audio(spec: {
+        bgm?: { volume?: number; mood?: string } | null;
+        narration?: { wav: string; delay?: number; volume?: number } | null;
+        sfx?: Array<{ at: number; kind: 'whoosh' | 'tick' | 'impact'; volume?: number }>;
+    }): this {
+        this.audioSpec = {
+            bgm: spec.bgm,
+            narration: spec.narration ? { wav: spec.narration.wav, delayFrames: frames(spec.narration.delay ?? 0, this.fps), volume: spec.narration.volume } : null,
+            sfx: (spec.sfx ?? []).map((sfx) => ({ ...sfx, at: frames(sfx.at, this.fps) })),
+        };
         return this;
     }
 

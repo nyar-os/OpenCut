@@ -5,6 +5,10 @@
 //! encoded to MP4 through the Windows Media Foundation. No external media
 //! toolchain participates in the pipeline.
 
+// Item painters and text layout take the scene fields directly; bundling them
+// into structs at every call site would add indirection without clarity.
+#![allow(clippy::too_many_arguments)]
+
 pub mod audio;
 pub mod color;
 pub mod ease;
