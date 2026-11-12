@@ -8,6 +8,17 @@ import { native } from './native.js';
 import type { RenderResult } from './native.js';
 import type { AudioSpec, Background, CodeTheme, Item, Project } from './types.js';
 
+export type Ease =
+    | 'linear'
+    | 'in-out-cubic'
+    | 'out-cubic'
+    | 'out-quint'
+    | 'in-out-sine'
+    | 'out-expo'
+    | 'in-expo'
+    | 'in-out-quart'
+    | 'out-back';
+
 export interface FilmOptions {
     width?: number;
     height?: number;
@@ -35,7 +46,7 @@ export type CameraInput = {
     zoomTo?: number;
     focusFrom?: [number, number];
     focusTo?: [number, number];
-    ease?: 'linear' | 'in-out-cubic' | 'out-cubic' | 'out-quint' | 'in-out-sine';
+    ease?: Ease;
     rotateTo?: number;
 };
 
@@ -54,6 +65,11 @@ function compileItem(item: ItemInput, fps: number, sceneSeconds: number): Item {
     out['dur'] = Math.max(1, frames((item.dur ?? sceneSeconds) as number, fps));
     out['fadeIn'] = Math.max(1, frames((item.fadeIn ?? DEFAULT_FADE) as number, fps));
     out['fadeOut'] = Math.max(1, frames((item.fadeOut ?? DEFAULT_FADE) as number, fps));
+    // A layer's children keep their own (layer-relative) timing, in seconds.
+    if (item.kind === 'layer' && Array.isArray(item['items'])) {
+        const children = item['items'] as ItemInput[];
+        out['items'] = children.map((child) => compileItem(child, fps, sceneSeconds));
+    }
     return out as unknown as Item;
 }
 
@@ -64,6 +80,7 @@ export class Film {
     readonly fps: number;
     private readonly sceneList: SceneInput[] = [];
     private audioSpec: AudioSpec | null = null;
+    private cameraKeys: Array<{ at: number; zoom: number; focus: [number, number]; rotate: number; ease: Ease }> = [];
 
     constructor(options: FilmOptions = {}) {
         this.width = options.width ?? 1920;
@@ -103,6 +120,19 @@ export class Film {
         return this;
     }
 
+    /** Camera curve for the whole film. Keys are in seconds and are
+     *  interpolated continuously, so the result plays as one take. */
+    camera(keys: Array<{ at: number; zoom: number; focus?: [number, number]; rotate?: number; ease?: Ease }>): this {
+        this.cameraKeys = keys.map((key) => ({
+            at: frames(key.at, this.fps),
+            zoom: key.zoom,
+            focus: key.focus ?? [0.5, 0.5],
+            rotate: key.rotate ?? 0,
+            ease: key.ease ?? 'in-out-sine',
+        }));
+        return this;
+    }
+
     /** Total duration in seconds. */
     get seconds(): number {
         return this.sceneList.reduce((sum, scene) => sum + scene.duration, 0);
@@ -139,6 +169,7 @@ export class Film {
             durationFrames: cursor,
             scenes,
             audio: this.audioSpec,
+            camera: this.cameraKeys,
         };
     }
 
@@ -315,6 +346,42 @@ export interface PathOptions {
  */
 export function path(options: PathOptions): ItemInput {
     return { kind: 'path', color: '#7aa2ff', stroke: 3, progress: 1, scale: 1, rotate: 0, dur: options.dur ?? 4, ...options } as ItemInput;
+}
+
+/**
+ * A group whose opacity follows the camera zoom. Two layers with overlapping
+ * zoom windows cross-fade instead of cutting, which is what lets a single
+ * continuous camera move carry the film from one idea to the next.
+ */
+export interface LayerOptions {
+    at?: number;
+    dur?: number;
+    zoomFrom: number;
+    zoomTo: number;
+    edge?: number;
+    items: ItemInput[];
+}
+
+export function layer(options: LayerOptions): ItemInput {
+    return { kind: 'layer', edge: 0.12, dur: options.dur ?? 999, ...options } as ItemInput;
+}
+
+/** Soft additive light. A disc with a hard edge reads as a sticker, this reads
+ *  as light; `radius` is a fraction of the frame width. */
+export interface GlowOptions {
+    at?: number;
+    dur?: number;
+    x: number;
+    y: number;
+    radius: number;
+    color?: string;
+    intensity?: number;
+    fadeIn?: number;
+    fadeOut?: number;
+}
+
+export function glow(options: GlowOptions): ItemInput {
+    return { kind: 'glow', color: '#f2c98a', intensity: 1, dur: options.dur ?? 6, ...options } as ItemInput;
 }
 
 export interface FootnoteOptions {

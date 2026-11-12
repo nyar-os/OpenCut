@@ -4,7 +4,16 @@
  */
 
 export type Align = 'left' | 'center' | 'right';
-export type Ease = 'linear' | 'in-out-cubic' | 'out-cubic' | 'out-quint' | 'in-out-sine';
+export type Ease =
+    | 'linear'
+    | 'in-out-cubic'
+    | 'out-cubic'
+    | 'out-quint'
+    | 'in-out-sine'
+    | 'out-expo'
+    | 'in-expo'
+    | 'in-out-quart'
+    | 'out-back';
 export type ShapeKind = 'rect' | 'circle' | 'ring' | 'line';
 /** How imported media is mapped into its layout box. */
 export type Fit = 'contain' | 'cover' | 'stretch';
@@ -159,6 +168,30 @@ export type Item =
           blend?: 'normal' | 'add';
           fadeIn?: number;
           fadeOut?: number;
+      }
+    | {
+          kind: 'layer';
+          at: number;
+          dur: number;
+          /** Zoom range in which this group is visible. */
+          zoomFrom: number;
+          zoomTo: number;
+          /** Zoom width of the cross-fade outside the window. */
+          edge?: number;
+          items: Item[];
+      }
+    | {
+          kind: 'glow';
+          at: number;
+          dur: number;
+          x: number;
+          y: number;
+          /** Radius as a fraction of the frame width. */
+          radius: number;
+          color?: string;
+          intensity?: number;
+          fadeIn?: number;
+          fadeOut?: number;
       };
 
 export interface BgmSpec {
@@ -211,6 +244,15 @@ export interface Camera {
     rotateTo?: number;
 }
 
+/** A key on the film-wide camera curve, positioned by frame. */
+export interface CameraKey {
+    at: number;
+    zoom: number;
+    focus?: [number, number];
+    rotate?: number;
+    ease?: Ease;
+}
+
 export interface Project {
     width: number;
     height: number;
@@ -218,4 +260,6 @@ export interface Project {
     durationFrames: number;
     scenes: Scene[];
     audio?: AudioSpec | null;
+    /** One continuous camera move for the whole film. */
+    camera?: CameraKey[];
 }
