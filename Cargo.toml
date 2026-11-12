@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/napi"]
-default-members = ["crates/core", "crates/napi"]
+members = ["crates/napi"]
+default-members = ["crates/napi"]
 
 [workspace.package]
 version = "0.0.1"
@@ -12,19 +12,13 @@ authors = ["OpenCut Authors"]
 repository = "https://github.com/nyar-os/OpenCut"
 
 [workspace.dependencies]
-serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-fontdue = "0.9"
-windows = { version = "0.61", features = [
-    "Win32_Foundation",
-    "Win32_Graphics_Imaging",
-    "Win32_Media_MediaFoundation",
-    "Win32_Media_Audio",
-    "Win32_System_Com",
-] }
 # Cross-repo git dependencies must pin the full 40-character revision.
 wae = { git = "https://github.com/doki-land/wae-framework.git", rev = "66f5d003fec85e28503968fd0a6a271beef0f389" }
-opencut-core = { path = "crates/core" }
+# The renderer lives upstream. Local development resolves it by path; once the
+# upstream tree is published the dependency becomes a pinned git revision:
+# media = { git = "https://github.com/muse-gpt/ucf.rs.git", rev = "<40-hex>" }
+media = { path = "../../多媒体研究/media.rs/projects/media/media" }
 
 [profile.release]
 lto = true

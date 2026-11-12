@@ -6,7 +6,7 @@
 
 #![deny(missing_docs)]
 
-use opencut_core::render::RenderStats;
+use media::render::RenderStats;
 use serde_json::json;
 use wae::{CallContext, Env, Error, JsValue, Result, function, register_module};
 
@@ -34,7 +34,7 @@ fn render_project(ctx: CallContext) -> Result<JsValue> {
         std::fs::create_dir_all(parent)
             .map_err(|e| Error::new(format!("cannot create output directory: {e}")))?;
     }
-    let stats = opencut_core::render::render_project(&project, path, &mut |done, total| {
+    let stats = media::render_project(&project, path, &mut |done, total| {
         if done == total || done % 30 == 0 {
             println!("opencut: frame {done}/{total}");
         }
@@ -43,7 +43,7 @@ fn render_project(ctx: CallContext) -> Result<JsValue> {
     json_to_js(ctx.env(), &to_json(&stats))
 }
 
-fn core_error(error: opencut_core::Error) -> Error {
+fn core_error(error: media::Error) -> Error {
     Error::new(format!("{}: {}", error.code(), error))
 }
 
