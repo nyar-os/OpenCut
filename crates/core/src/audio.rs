@@ -36,6 +36,9 @@ pub fn build_audio(
                 "whoosh" => whoosh(&mut buf, seconds, sfx.volume),
                 "tick" => tick(&mut buf, seconds, sfx.volume),
                 "impact" => impact(&mut buf, seconds, sfx.volume),
+                "riser" => riser(&mut buf, seconds, sfx.volume),
+                "glitch" => glitch(&mut buf, seconds, sfx.volume),
+                "sub" => sub_drop(&mut buf, seconds, sfx.volume),
                 _ => {}
             }
         }
@@ -192,6 +195,67 @@ fn impact(buf: &mut [f32], at_seconds: f64, volume: f32) {
         let t = i as f64 / SAMPLE_RATE as f64;
         let env = (-t * 9.0).exp();
         let s = (72.0 * t * std::f64::consts::TAU).sin() * env * volume as f64;
+        buf[(start + i) * 2] += s as f32;
+        buf[(start + i) * 2 + 1] += s as f32;
+    }
+}
+
+/// Rising filtered noise, used to build tension into a cut.
+fn riser(buf: &mut [f32], at_seconds: f64, volume: f32) {
+    let start = (at_seconds * SAMPLE_RATE as f64) as usize;
+    let len = (1.6 * SAMPLE_RATE as f64) as usize;
+    let total = frames_len(buf);
+    let mut seed = (start as u32) | 0x5f37;
+    let mut low = 0.0f32;
+    for i in 0..len {
+        if start + i >= total {
+            break;
+        }
+        let t = i as f32 / len as f32;
+        seed = hash(seed);
+        let noise = (seed as f32 / u32::MAX as f32) * 2.0 - 1.0;
+        // The filter opens up as the riser climbs.
+        low += (noise - low) * (0.01 + t * t * 0.5);
+        let env = t * t;
+        let v = low * env * volume;
+        buf[(start + i) * 2] += v;
+        buf[(start + i) * 2 + 1] += v * 0.9;
+    }
+}
+
+/// Short bit-crushed burst for a hard cut.
+fn glitch(buf: &mut [f32], at_seconds: f64, volume: f32) {
+    let start = (at_seconds * SAMPLE_RATE as f64) as usize;
+    let len = (0.14 * SAMPLE_RATE as f64) as usize;
+    let total = frames_len(buf);
+    for i in 0..len {
+        if start + i >= total {
+            break;
+        }
+        let t = i as f32 / SAMPLE_RATE as f32;
+        let env = (1.0 - i as f32 / len as f32).powi(2);
+        // Quantize a square wave to a few levels for the crushed edge.
+        let square: f32 = if (t * 940.0).fract() < 0.5 { 1.0 } else { -1.0 };
+        let stepped = (square * 3.0).round() / 3.0;
+        let v = stepped * env * volume;
+        buf[(start + i) * 2] += v;
+        buf[(start + i) * 2 + 1] += v * 0.85;
+    }
+}
+
+/// Sub-bass drop that lands under a cut.
+fn sub_drop(buf: &mut [f32], at_seconds: f64, volume: f32) {
+    let start = (at_seconds * SAMPLE_RATE as f64) as usize;
+    let len = (0.9 * SAMPLE_RATE as f64) as usize;
+    let total = frames_len(buf);
+    for i in 0..len {
+        if start + i >= total {
+            break;
+        }
+        let t = i as f64 / SAMPLE_RATE as f64;
+        let env = (-t * 3.4).exp();
+        let freq = 92.0 - t * 46.0;
+        let s = (freq * t * std::f64::consts::TAU).sin() * env * volume as f64;
         buf[(start + i) * 2] += s as f32;
         buf[(start + i) * 2 + 1] += s as f32;
     }

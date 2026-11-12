@@ -90,6 +90,7 @@ pub struct Frame {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
+    clip: Option<[u32; 4]>,
 }
 
 impl Frame {
@@ -99,6 +100,32 @@ impl Frame {
             width,
             height,
             pixels: vec![0; (width as usize) * (height as usize) * 4],
+            clip: None,
+        }
+    }
+
+    /// Restricts every subsequent paint to `rect` (x0, y0, x1, y1).
+    pub fn set_clip(&mut self, rect: [f32; 4]) {
+        let x0 = rect[0].max(0.0) as u32;
+        let y0 = rect[1].max(0.0) as u32;
+        let x1 = rect[2].min(self.width as f32) as u32;
+        let y1 = rect[3].min(self.height as f32) as u32;
+        self.clip = if x1 > x0 && y1 > y0 {
+            Some([x0, y0, x1, y1])
+        } else {
+            Some([0, 0, 0, 0])
+        };
+    }
+
+    pub fn clear_clip(&mut self) {
+        self.clip = None;
+    }
+
+    #[inline]
+    fn inside_clip(&self, x: u32, y: u32) -> bool {
+        match self.clip {
+            None => true,
+            Some([x0, y0, x1, y1]) => x >= x0 && x < x1 && y >= y0 && y < y1,
         }
     }
 
@@ -113,6 +140,9 @@ impl Frame {
 
     #[inline]
     pub fn blend(&mut self, x: u32, y: u32, c: Rgba) {
+        if !self.inside_clip(x, y) {
+            return;
+        }
         let i = ((y * self.width + x) as usize) * 4;
         let a = c.0[3] as u32;
         if a >= 255 {
@@ -236,6 +266,136 @@ impl Frame {
                     self.blend(px, py, c);
                 }
             }
+        }
+    }
+
+    /// Samples `src` with bilinear filtering at fractional coordinates.
+    #[must_use]
+    pub fn sample(&self, sx: f32, sy: f32) -> [f32; 4] {
+        let w = self.width.saturating_sub(1) as f32;
+        let h = self.height.saturating_sub(1) as f32;
+        let x = sx.clamp(0.0, w);
+        let y = sy.clamp(0.0, h);
+        let x0 = x.floor();
+        let y0 = y.floor();
+        let fx = x - x0;
+        let fy = y - y0;
+        let (x0, y0) = (x0 as u32, y0 as u32);
+        let x1 = (x0 + 1).min(self.width.saturating_sub(1));
+        let y1 = (y0 + 1).min(self.height.saturating_sub(1));
+        let at = |px: u32, py: u32| -> [f32; 4] {
+            let i = ((py * self.width + px) as usize) * 4;
+            [
+                self.pixels[i] as f32,
+                self.pixels[i + 1] as f32,
+                self.pixels[i + 2] as f32,
+                self.pixels[i + 3] as f32,
+            ]
+        };
+        let (p00, p10, p01, p11) = (at(x0, y0), at(x1, y0), at(x0, y1), at(x1, y1));
+        let mut out = [0.0f32; 4];
+        for k in 0..4 {
+            let top = p00[k] + (p10[k] - p00[k]) * fx;
+            let bottom = p01[k] + (p11[k] - p01[k]) * fx;
+            out[k] = top + (bottom - top) * fy;
+        }
+        out
+    }
+
+    /// Camera transform: samples `src` around `focus` at `zoom` and optional
+    /// rotation, then writes the result into this frame. Used to push, pull and
+    /// pan a whole scene like a real lens.
+    pub fn resample_from(&mut self, src: &Frame, zoom: f32, focus: [f32; 2], rotate_deg: f32) {
+        let zoom = zoom.max(0.05);
+        let angle = rotate_deg.to_radians();
+        let (sin, cos) = angle.sin_cos();
+        let w = self.width as f32;
+        let h = self.height as f32;
+        for y in 0..self.height {
+            let v = (y as f32 + 0.5) / h - 0.5;
+            for x in 0..self.width {
+                let u = (x as f32 + 0.5) / w - 0.5;
+                // Undo zoom, then rotate the sample position.
+                let zu = u / zoom;
+                let zv = v / zoom;
+                let ru = zu * cos + zv * sin;
+                let rv = -zu * sin + zv * cos;
+                let sx = (focus[0] + ru) * src.width as f32 - 0.5;
+                let sy = (focus[1] + rv) * src.height as f32 - 0.5;
+                let texel = src.sample(sx, sy);
+                let i = ((y * self.width + x) as usize) * 4;
+                self.pixels[i] = texel[0] as u8;
+                self.pixels[i + 1] = texel[1] as u8;
+                self.pixels[i + 2] = texel[2] as u8;
+                self.pixels[i + 3] = 255;
+            }
+        }
+    }
+
+    /// Additive blend of one pixel (light, glow, overlays).
+    #[inline]
+    pub fn add_pixel(&mut self, x: u32, y: u32, c: Rgba) {
+        if !self.inside_clip(x, y) {
+            return;
+        }
+        self.add(x, y, c);
+    }
+
+    /// Paints a soft-edged band across the frame at `angle` degrees.
+    ///
+    /// Falloff is gaussian so the band reads as light in the air rather than as
+    /// a painted stripe.
+    pub fn band(&mut self, center_y: f32, angle_deg: f32, thickness: f32, c: Rgba) {
+        let angle = angle_deg.to_radians();
+        let (sin, cos) = angle.sin_cos();
+        let half = thickness / 2.0;
+        let steps = thickness.ceil().max(1.0) as u32;
+        for s in 0..steps {
+            let offset = s as f32 - half;
+            let normalized = offset / half;
+            let falloff = (-normalized * normalized * 2.6).exp();
+            if falloff <= 0.002 {
+                continue;
+            }
+            let alpha = (c.0[3] as f32 * falloff) as u8;
+            if alpha == 0 {
+                continue;
+            }
+            let color = Rgba([c.0[0], c.0[1], c.0[2], alpha]);
+            let cx = self.width as f32 / 2.0 + offset * -sin;
+            let cy = center_y + offset * cos;
+            let dx = cos * self.width as f32;
+            let dy = sin * self.width as f32;
+            self.add_pixel_line(cx - dx, cy - dy, cx + dx, cy + dy, color);
+        }
+    }
+
+    fn add_pixel_line(&mut self, x0: f32, y0: f32, x1: f32, y1: f32, c: Rgba) {
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let steps = dx.abs().max(dy.abs()).max(1.0) as u32;
+        for s in 0..=steps {
+            let t = s as f32 / steps as f32;
+            let px = x0 + dx * t;
+            let py = y0 + dy * t;
+            if px < 0.0 || py < 0.0 || px >= self.width as f32 || py >= self.height as f32 {
+                continue;
+            }
+            self.add_pixel(px as u32, py as u32, c);
+        }
+    }
+
+    /// Sprinkles deterministic grain; `seed` changes per frame.
+    pub fn grain(&mut self, density: u32, strength: f32, seed: u32) {
+        let amount = ((strength.clamp(0.0, 1.0)) * 255.0) as u8;
+        for i in 0..density {
+            let h = hash(seed.wrapping_mul(2_654_435_761).wrapping_add(i));
+            let x = (h & 0xffff) % self.width;
+            let y = ((h >> 16) & 0xffff) % self.height;
+            let bright = ((h >> 8) & 1) == 1;
+            let value = if bright { amount } else { 0 };
+            let c = Rgba([value, value, value, (amount as f32 * 0.5) as u8]);
+            self.add_pixel(x, y, c);
         }
     }
 

@@ -182,6 +182,16 @@ export interface Scene {
     duration: number;
     background?: Background;
     items?: Item[];
+    camera?: Camera | null;
+}
+
+export interface Camera {
+    zoomFrom?: number;
+    zoomTo?: number;
+    focusFrom?: [number, number];
+    focusTo?: [number, number];
+    ease?: Ease;
+    rotateTo?: number;
 }
 
 export interface Project {

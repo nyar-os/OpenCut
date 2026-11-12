@@ -25,6 +25,18 @@ export type SceneInput = {
     duration: number;
     background?: Background;
     items?: ItemInput[];
+    /** Camera move applied to the whole scene. */
+    camera?: CameraInput;
+};
+
+/** Camera move in human units: zoom factors, normalized focus, degrees. */
+export type CameraInput = {
+    zoomFrom?: number;
+    zoomTo?: number;
+    focusFrom?: [number, number];
+    focusTo?: [number, number];
+    ease?: 'linear' | 'in-out-cubic' | 'out-cubic' | 'out-quint' | 'in-out-sine';
+    rotateTo?: number;
 };
 
 /** Item input: same fields as the IR but `at`/`dur`/fades in seconds. */
@@ -108,6 +120,16 @@ export class Film {
                 duration,
                 background: scene.background,
                 items: (scene.items ?? []).map((item) => compileItem(item, this.fps, scene.duration)),
+                camera: scene.camera
+                    ? {
+                          zoomFrom: scene.camera.zoomFrom ?? 1,
+                          zoomTo: scene.camera.zoomTo ?? 1,
+                          focusFrom: scene.camera.focusFrom ?? [0.5, 0.5],
+                          focusTo: scene.camera.focusTo ?? scene.camera.focusFrom ?? [0.5, 0.5],
+                          ease: scene.camera.ease ?? 'in-out-cubic',
+                          rotateTo: scene.camera.rotateTo ?? 0,
+                      }
+                    : null,
             };
         });
         return {
@@ -151,6 +173,10 @@ export interface TextOptions {
     /** Characters revealed per frame (typewriter effect). */
     typing?: number;
     glow?: string;
+    /** Pixels each glyph rises from as it appears. 0 disables the stagger. */
+    rise?: number;
+    /** Frames between two glyphs entering. */
+    stagger?: number;
 }
 
 export function text(options: TextOptions): ItemInput {
@@ -227,12 +253,36 @@ export interface ShapeOptions {
     color?: string;
     radius?: number;
     stroke?: number;
+    /** Fraction drawn, for a line that draws itself in. */
+    progress?: number;
+    blend?: 'normal' | 'add';
     fadeIn?: number;
     fadeOut?: number;
 }
 
 export function shape(options: ShapeOptions): ItemInput {
     return { kind: 'shape', w: 0.1, h: 0.01, color: '#6ea0ff', dur: options.dur ?? 3, ...options } as ItemInput;
+}
+
+/** Soft diagonal light bands; `alpha` is the peak opacity of each band. */
+export function bands(options: {
+    at?: number;
+    dur?: number;
+    count?: number;
+    angle?: number;
+    speed?: number;
+    color?: string;
+    alpha?: number;
+    thickness?: number;
+    fadeIn?: number;
+    fadeOut?: number;
+}): ItemInput {
+    return { kind: 'bands', color: '#8fb4ff', alpha: 0.08, count: 3, angle: -18, speed: 26, thickness: 90, dur: options.dur ?? 4, ...options } as ItemInput;
+}
+
+/** Deterministic film grain, refreshed every frame. */
+export function grain(options: { at?: number; dur?: number; strength?: number; density?: number; fadeIn?: number; fadeOut?: number } = {}): ItemInput {
+    return { kind: 'grain', strength: 0.05, density: 9000, dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
 export interface FootnoteOptions {

@@ -10,7 +10,7 @@ use crate::encode::Encoder;
 use crate::error::Error;
 use crate::media::MediaLibrary;
 use crate::paint::{Frame, build_vignette, hash};
-use crate::scene::{Align, Background, Item, Project, ShapeKind};
+use crate::scene::{Align, Background, Blend, Item, Project, ShapeKind};
 use crate::text::Fonts;
 
 /// Facts about a finished render.
@@ -49,11 +49,20 @@ pub fn render_project(
     let audio_codec = encoder.audio_codec().to_string();
 
     let mut frame = Frame::new(w, h);
+    let mut scratch = Frame::new(w, h);
     let total = project.duration_frames;
     let rate = crate::audio::SAMPLE_RATE as usize;
     let mut written_samples = 0usize;
     for f in 0..total {
-        paint_frame(&project, &mut fonts, &mut media, &vignette, f, &mut frame);
+        paint_frame(
+            &project,
+            &mut fonts,
+            &mut media,
+            &vignette,
+            &mut scratch,
+            f,
+            &mut frame,
+        );
         encoder.write_video(&frame.to_nv12(), f, fps)?;
         // Interleave audio with video in one-second blocks.
         if (f + 1) % fps == 0 || f + 1 == total {
@@ -118,6 +127,7 @@ fn paint_frame(
     fonts: &mut Fonts,
     media: &mut MediaLibrary,
     vignette: &[u8],
+    scratch: &mut Frame,
     frame_index: u32,
     out: &mut Frame,
 ) {
@@ -128,19 +138,42 @@ fn paint_frame(
         .find(|s| frame_index >= s.start && frame_index < s.start + s.duration);
     if let Some(scene) = scene {
         let seconds = frame_index as f32 / project.fps as f32;
-        paint_background(out, &scene.background, seconds);
         let local = frame_index - scene.start;
+        // With a camera the scene renders off-screen, then that buffer is
+        // pushed, pulled or panned into the output frame like a real lens.
+        let camera = scene.camera.as_ref();
+        let target: &mut Frame = if camera.is_some() {
+            scratch.fill(Rgba([0, 0, 0, 255]));
+            &mut *scratch
+        } else {
+            &mut *out
+        };
+        paint_background(target, &scene.background, seconds);
         for item in &scene.items {
             paint_item(
                 project,
                 fonts,
                 media,
-                out,
+                target,
                 item,
                 local,
                 frame_index,
                 seconds,
             );
+        }
+        if let Some(camera) = camera {
+            let t = if scene.duration > 1 {
+                local as f32 / (scene.duration - 1) as f32
+            } else {
+                1.0
+            };
+            let eased = apply(camera.ease, t);
+            let zoom = camera.zoom_from + (camera.zoom_to - camera.zoom_from) * eased;
+            let focus = [
+                camera.focus_from[0] + (camera.focus_to[0] - camera.focus_from[0]) * eased,
+                camera.focus_from[1] + (camera.focus_to[1] - camera.focus_from[1]) * eased,
+            ];
+            out.resample_from(scratch, zoom, focus, camera.rotate_to * eased);
         }
     }
     out.apply_vignette(vignette);
@@ -218,6 +251,8 @@ fn paint_item(
             line_height,
             typing,
             glow,
+            stagger,
+            rise,
         } => {
             if local < *at || local >= *at + *dur {
                 return;
@@ -240,18 +275,37 @@ fn paint_item(
             let color = parse_or(Some(color), Rgba([230, 238, 250, 255])).with_alpha(alpha);
             let limit = max_width.map(|m| m * w);
             let lh = line_height.unwrap_or(1.25);
-            let drawn = fonts.draw_block(
-                frame,
-                visible,
-                px(*x, w as u32),
-                px(*y, h as u32) - drift,
-                *size,
-                *bold,
-                color,
-                *align,
-                limit,
-                lh,
-            );
+            let top = px(*y, h as u32) - drift;
+            let drawn = if *rise > 0.0 {
+                // Character-by-character entrance reads as motion, not as a
+                // block of text fading in.
+                fonts.draw_staggered(
+                    frame,
+                    visible,
+                    px(*x, w as u32),
+                    top,
+                    *size,
+                    *bold,
+                    color,
+                    *align,
+                    *stagger,
+                    *rise,
+                    life,
+                )
+            } else {
+                fonts.draw_block(
+                    frame,
+                    visible,
+                    px(*x, w as u32),
+                    top,
+                    *size,
+                    *bold,
+                    color,
+                    *align,
+                    limit,
+                    lh,
+                )
+            };
             if let Some(glow_color) = glow {
                 let gc = parse(glow_color);
                 if let Some(gc) = gc {
@@ -574,6 +628,8 @@ fn paint_item(
             color,
             radius,
             stroke,
+            progress,
+            blend,
             fade_in,
             fade_out,
         } => {
@@ -601,15 +657,78 @@ fn paint_item(
                 ShapeKind::Ring => {
                     frame.circle(cx, cy, px(*w, project.width) / 2.0, c, stroke.or(Some(3.0)))
                 }
-                ShapeKind::Line => frame.line(
-                    cx,
-                    cy,
-                    cx + px(*w, project.width),
-                    cy + px(*h, project.height),
-                    stroke.unwrap_or(2.0),
-                    c,
-                ),
+                ShapeKind::Line => {
+                    // `progress` lets a line draw itself, which is how motion
+                    // reads as intent rather than as a slideshow.
+                    let p = progress.clamp(0.0, 1.0);
+                    let ex = cx + px(*w, project.width) * p;
+                    let ey = cy + px(*h, project.height) * p;
+                    let thickness = stroke.unwrap_or(2.0);
+                    match blend {
+                        Blend::Normal => frame.line(cx, cy, ex, ey, thickness, c),
+                        Blend::Add => {
+                            let steps = ((ex - cx).abs().max((ey - cy).abs()) as u32).max(1);
+                            for s in 0..=steps {
+                                let t = s as f32 / steps as f32;
+                                let point = (cx + (ex - cx) * t, cy + (ey - cy) * t);
+                                frame.add_pixel(point.0 as u32, point.1 as u32, c);
+                                frame.add_pixel(point.0 as u32 + 1, point.1 as u32, c);
+                            }
+                        }
+                    }
+                    if p > 0.01 && p < 0.999 {
+                        frame.glow(ex, ey, thickness * 5.0, c);
+                    }
+                }
             }
+        }
+        Item::Bands {
+            at,
+            dur,
+            count,
+            angle,
+            speed,
+            color,
+            alpha,
+            thickness,
+            fade_in,
+            fade_out,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            let life = local - *at;
+            let opacity = fade(life, *dur, *fade_in, *fade_out) * alpha;
+            if opacity <= 0.001 {
+                return;
+            }
+            let c = parse_or(Some(color), Rgba([120, 170, 255, 255])).with_alpha(opacity);
+            let height = project.height as f32;
+            let seconds = life as f32 / project.fps as f32;
+            let count = (*count).max(1);
+            for i in 0..count {
+                let base = height * (i as f32 + 1.0) / (count as f32 + 1.0);
+                let drift = seconds * speed * if i % 2 == 0 { 1.0 } else { -0.6 };
+                frame.band(base + drift, *angle, *thickness, c);
+            }
+        }
+        Item::Grain {
+            at,
+            dur,
+            strength,
+            density,
+            fade_in,
+            fade_out,
+        } => {
+            if local < *at || local >= *at + *dur {
+                return;
+            }
+            let life = local - *at;
+            let opacity = fade(life, *dur, *fade_in, *fade_out);
+            if opacity <= 0.001 {
+                return;
+            }
+            frame.grain(*density, strength * opacity, frame_index.wrapping_add(1));
         }
         Item::Footnote {
             at,

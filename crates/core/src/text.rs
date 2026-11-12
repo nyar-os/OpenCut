@@ -246,6 +246,60 @@ impl Fonts {
         }
     }
 
+    /// Draws one line character by character, each glyph rising into place on
+    /// a stagger. `life` is frames since the item appeared.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_staggered(
+        &mut self,
+        frame: &mut Frame,
+        text: &str,
+        x: f32,
+        top: f32,
+        size: f32,
+        bold: bool,
+        color: Rgba,
+        align: Align,
+        stagger: u32,
+        rise: f32,
+        life: u32,
+    ) -> f32 {
+        let id = if bold { FontId::Bold } else { FontId::Regular };
+        let total = self.measure(text, size, bold, false);
+        let mut pen = match align {
+            Align::Left => x,
+            Align::Center => x - total / 2.0,
+            Align::Right => x - total,
+        };
+        let per_char_fade = 8u32;
+        let stagger = stagger.max(1);
+        for (index, ch) in text.chars().enumerate() {
+            let start = index as u32 * stagger;
+            let p = if life <= start {
+                0.0
+            } else {
+                ((life - start) as f32 / per_char_fade as f32).clamp(0.0, 1.0)
+            };
+            let advance = self.measure(&ch.to_string(), size, bold, false);
+            if p > 0.001 {
+                let eased = 1.0 - (1.0 - p).powi(3);
+                let offset = (1.0 - eased) * rise;
+                let alpha = color.0[3] as f32 * eased;
+                let c = Rgba([color.0[0], color.0[1], color.0[2], alpha as u8]);
+                self.draw_line(
+                    frame,
+                    &ch.to_string(),
+                    pen,
+                    top + size * 0.82 + offset,
+                    size,
+                    id,
+                    c,
+                );
+            }
+            pen += advance;
+        }
+        size * 1.2
+    }
+
     /// Draws wrapped text anchored at `x`/`y` (top) with alignment; returns height.
     pub fn draw_block(
         &mut self,

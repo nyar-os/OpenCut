@@ -29,6 +29,34 @@ pub struct Scene {
     pub background: Background,
     #[serde(default)]
     pub items: Vec<Item>,
+    /// Camera move for this scene: content renders off-screen, then this
+    /// transform pushes/pulls and pans it into the output frame.
+    #[serde(default)]
+    pub camera: Option<Camera>,
+}
+
+/// A single camera move, interpolated across the whole scene.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Camera {
+    #[serde(default = "default_one")]
+    pub zoom_from: f32,
+    #[serde(default = "default_one")]
+    pub zoom_to: f32,
+    /// Focus point at the start and end, in normalized frame coordinates.
+    #[serde(default = "default_center")]
+    pub focus_from: [f32; 2],
+    #[serde(default = "default_center")]
+    pub focus_to: [f32; 2],
+    #[serde(default)]
+    pub ease: Ease,
+    /// Extra rotation in degrees at the end of the move.
+    #[serde(default)]
+    pub rotate_to: f32,
+}
+
+fn default_center() -> [f32; 2] {
+    [0.5, 0.5]
 }
 
 /// Painted behind the items for the life of the scene.
@@ -88,6 +116,14 @@ fn default_fade() -> u32 {
     10
 }
 
+fn default_stagger() -> u32 {
+    1
+}
+
+fn default_one_f32() -> f32 {
+    1.0
+}
+
 /// Horizontal anchor of a text-anchored item.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -108,6 +144,37 @@ pub enum Ease {
     OutCubic,
     OutQuint,
     InOutSine,
+}
+
+/// How a shape is composited onto the frame.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum Blend {
+    #[default]
+    Normal,
+    Add,
+}
+
+fn default_band_count() -> u32 {
+    3
+}
+fn default_band_angle() -> f32 {
+    -18.0
+}
+fn default_band_speed() -> f32 {
+    26.0
+}
+fn default_band_alpha() -> f32 {
+    0.08
+}
+fn default_band_thickness() -> f32 {
+    90.0
+}
+fn default_grain() -> f32 {
+    0.05
+}
+fn default_grain_density() -> u32 {
+    9_000
 }
 
 /// Primitive shape kinds.
@@ -238,6 +305,12 @@ pub enum Item {
         typing: Option<f32>,
         #[serde(default)]
         glow: Option<String>,
+        /// Character entrance: each glyph rises and fades in on a stagger.
+        #[serde(default = "default_stagger")]
+        stagger: u32,
+        /// Pixels each glyph rises from, when `stagger` > 0.
+        #[serde(default)]
+        rise: f32,
     },
     Code {
         at: u32,
@@ -313,6 +386,46 @@ pub enum Item {
         radius: f32,
         #[serde(default)]
         stroke: Option<f32>,
+        /// Fraction of the shape drawn, used for lines that draw themselves.
+        #[serde(default = "default_one_f32")]
+        progress: f32,
+        /// `normal` or `add` (light-like overlays).
+        #[serde(default)]
+        blend: Blend,
+        #[serde(default = "default_fade")]
+        fade_in: u32,
+        #[serde(default = "default_fade")]
+        fade_out: u32,
+    },
+    /// Soft diagonal light bands that drift across the frame.
+    Bands {
+        at: u32,
+        dur: u32,
+        #[serde(default = "default_band_count")]
+        count: u32,
+        #[serde(default = "default_band_angle")]
+        angle: f32,
+        /// Vertical drift in pixels per second.
+        #[serde(default = "default_band_speed")]
+        speed: f32,
+        color: String,
+        #[serde(default = "default_band_alpha")]
+        alpha: f32,
+        #[serde(default = "default_band_thickness")]
+        thickness: f32,
+        #[serde(default = "default_fade")]
+        fade_in: u32,
+        #[serde(default = "default_fade")]
+        fade_out: u32,
+    },
+    /// Deterministic per-frame film grain.
+    Grain {
+        at: u32,
+        dur: u32,
+        #[serde(default = "default_grain")]
+        strength: f32,
+        #[serde(default = "default_grain_density")]
+        density: u32,
         #[serde(default = "default_fade")]
         fade_in: u32,
         #[serde(default = "default_fade")]
