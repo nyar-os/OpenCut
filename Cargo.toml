@@ -17,7 +17,7 @@ serde_json = "1"
 wae = { git = "https://github.com/doki-land/wae-framework.git", rev = "66f5d003fec85e28503968fd0a6a271beef0f389" }
 # The renderer lives upstream. The revision is pinned to a full 40-character
 # commit so any checkout resolves the exact same source; bump it deliberately.
-media = { git = "https://github.com/oovm/boost.rs.git", rev = "c4ad7e17499170b38df42847996cdfe55bf58d38" }
+media = { git = "https://github.com/oovm/boost.rs.git", rev = "50e3d95d57d7c8fdaa95f4ea9356f4b083e02737" }
 
 [profile.release]
 lto = true

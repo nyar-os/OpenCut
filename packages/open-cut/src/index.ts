@@ -4,7 +4,7 @@
  * The public authoring surface is the DSL; the native binding is re-exported
  * for hosts that want the raw IR path.
  */
-export { Film, anim, bands, card, code, counter, footnote, glow, grain, image, instance, layer, path, progress, shape, text, video } from './dsl.js';
+export { Film, anim, bands, card, code, colorToken, counter, footnote, glow, grain, image, instance, layer, path, progress, shape, text, video } from './dsl.js';
 export type {
     CameraInput,
     CardOptions,

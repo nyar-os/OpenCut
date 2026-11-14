@@ -419,6 +419,21 @@ export interface Scene {
     background?: Background;
     items?: Item[];
     camera?: Camera | null;
+    /** Scene-level design overrides applied on top of the project card. */
+    design?: DesignSpec;
+}
+
+/** One semantic color declared once and referenced as `$role`. */
+export interface ColorEntry {
+    role: string;
+    value: string;
+    /** A locked project role cannot be overridden by a scene card. */
+    locked?: boolean;
+}
+
+/** Semantic color card shared by the project and scene layers. */
+export interface DesignSpec {
+    colors?: ColorEntry[];
 }
 
 export interface Camera {
@@ -465,4 +480,6 @@ export interface Project {
     camera?: CameraKey[];
     post?: PostSpec;
     fonts?: FontsSpec | null;
+    /** Semantic color card; color fields may reference `$role`. */
+    design?: DesignSpec;
 }

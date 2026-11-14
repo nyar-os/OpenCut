@@ -12,6 +12,7 @@ import type {
     Background,
     CodeTheme,
     Component,
+    DesignSpec,
     FontsSpec,
     Item,
     Keyframe,
@@ -43,6 +44,8 @@ export interface FilmOptions {
     post?: PostSpec;
     /** Explicit font files; omit to let the host discover them and report them. */
     fonts?: FontsSpec;
+    /** Project-level semantic color card. */
+    design?: DesignSpec;
 }
 
 interface TimedInput {
@@ -58,6 +61,8 @@ export type SceneInput = {
     items?: ItemInput[];
     /** Camera move applied to the whole scene. */
     camera?: CameraInput;
+    /** Scene-level design overrides; locked project roles are rejected. */
+    design?: DesignSpec;
 };
 
 /** Camera move in human units: zoom factors, normalized focus, degrees. */
@@ -159,6 +164,7 @@ export class Film {
     readonly fps: number;
     private readonly post: PostSpec;
     private readonly fonts: FontsSpec | null;
+    private designSpec: DesignSpec | null;
     private readonly sceneList: SceneInput[] = [];
     private readonly componentList: ComponentInput[] = [];
     private audioSpec: AudioSpec | null = null;
@@ -170,6 +176,15 @@ export class Film {
         this.fps = options.fps ?? 30;
         this.post = options.post ?? {};
         this.fonts = options.fonts ?? null;
+        this.designSpec = options.design ?? null;
+    }
+
+    /** Declares semantic colors. Any color field may then use `$role`;
+     *  resolution happens in the core before validation, so a locked role is
+     *  a hard contract rather than a UI hint. */
+    design(spec: DesignSpec): this {
+        this.designSpec = spec;
+        return this;
     }
 
     /** Appends a scene; scenes run back to back in call order. */
@@ -249,6 +264,7 @@ export class Film {
                 duration,
                 background: scene.background,
                 items: (scene.items ?? []).map((item) => compileItem(item, this.fps, scene.duration)),
+                design: scene.design,
                 camera: scene.camera
                     ? {
                           zoomFrom: scene.camera.zoomFrom ?? 1,
@@ -275,6 +291,7 @@ export class Film {
             camera: this.cameraKeys,
             post: this.post,
             fonts: this.fonts,
+            design: this.designSpec ?? undefined,
         };
     }
 
@@ -301,6 +318,11 @@ export class Film {
             cancelFile: options.cancelFile,
         });
     }
+}
+
+/** Reference a declared design role, e.g. `colorToken('accent') === '$accent'`. */
+export function colorToken(role: string): string {
+    return role.startsWith('$') ? role : `$${role}`;
 }
 
 /**
