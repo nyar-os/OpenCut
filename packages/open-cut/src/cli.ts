@@ -6,6 +6,7 @@
  *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--scene id] [--cancel-file path] [--json]
  *   open-cut verify <film.mjs|film.ts> --out file.mp4 [--json]
  *   open-cut preview <film.mjs|film.ts> --frame N --out file.png [--json]
+ *   open-cut preview <film.mjs|film.ts> --at seconds --out file.png [--json]
  *   open-cut build [--json]
  *   open-cut version
  *
@@ -62,16 +63,29 @@ if (command === 'preview') {
         fail('preview requires a film script path', 2);
     }
     const frameArg = flag(args, '--frame');
+    const atArg = flag(args, '--at');
     const outArg = flag(args, '--out');
-    if (frameArg === undefined || outArg === undefined) {
-        fail('preview requires --frame <index> and --out <file.png>', 2);
+    if (outArg === undefined) {
+        fail('preview requires --out <file.png> and either --frame <index> or --at <seconds>', 2);
+    }
+    if ((frameArg === undefined) === (atArg === undefined)) {
+        fail('preview takes exactly one of --frame <index> or --at <seconds>', 2);
     }
     const module = await import(pathToFileURL(path.resolve(script)).href);
     const film: unknown = module.default ?? module.film;
     if (!(film instanceof Film)) {
         fail('the film module must default-export a Film instance', 2);
     }
-    const frame = Math.round(Number(frameArg));
+    const frame =
+        atArg !== undefined
+            ? (() => {
+                  const seconds = Number(atArg);
+                  if (!Number.isFinite(seconds) || seconds < 0) {
+                      fail(`--at must be a non-negative number of seconds, got ${atArg}`, 2);
+                  }
+                  return Math.round(seconds * film.fps);
+              })()
+            : Math.round(Number(frameArg));
     try {
         const stats = film.preview(frame, path.resolve(outArg));
         if (args.includes('--json')) {
