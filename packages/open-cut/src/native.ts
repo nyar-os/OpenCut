@@ -27,6 +27,8 @@ export interface RenderResult {
     range: [number, number];
     /** Font files the render loaded, in role order. */
     fonts: string[];
+    /** FNV-1a hash of each loaded font file's bytes, in the same order. */
+    fontHashes: string[];
     /** FNV-1a hash of the project JSON that produced the file. */
     projectHash: string;
     /** Declared optional resources that stayed empty. */

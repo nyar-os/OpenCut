@@ -71,7 +71,7 @@ fn render_project(ctx: CallContext) -> Result<JsValue> {
             .as_ref()
             .is_some_and(|path| std::path::Path::new(path).exists())
     };
-    let options = RenderOptions { range, cancel: Some(&cancel) };
+    let options = RenderOptions { range, cancel: Some(&cancel), ..Default::default() };
     let stats = media::render::render_project_with(&project, path, &options, &mut |done, total| {
         if done == total || done % 30 == 0 {
             println!("opencut: frame {done}/{total}");
@@ -145,6 +145,7 @@ fn to_json(stats: &RenderStats) -> serde_json::Value {
         "audio": stats.audio,
         "range": stats.range,
         "fonts": stats.fonts,
+        "fontHashes": stats.font_hashes,
         "projectHash": stats.project_hash,
         "optionalMissing": stats.optional_missing,
     })
