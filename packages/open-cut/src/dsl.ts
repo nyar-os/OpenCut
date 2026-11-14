@@ -182,8 +182,30 @@ export class Film {
 
     /** Renders the compiled project into `outPath` (MP4). */
     render(outPath: string): RenderResult {
-        return native.renderProject({ project: JSON.stringify(this.toProject()), out: outPath });
+        return native.renderProject({ project: JSON.stringify(toWire(this.toProject())), out: outPath });
     }
+}
+
+/**
+ * Converts the JS authoring shape into the domain wire shape.
+ *
+ * `media.rs` keeps Rust-native snake_case field names — JS style is this
+ * binding's concern only. All keys are converted here, at the single boundary
+ * where the project crosses into the native module, so the TypeScript API can
+ * stay camelCase without pushing that spelling into the domain.
+ */
+export function toWire(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(toWire);
+    }
+    if (value !== null && typeof value === 'object') {
+        const out: Record<string, unknown> = {};
+        for (const [key, inner] of Object.entries(value)) {
+            out[key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)] = toWire(inner);
+        }
+        return out;
+    }
+    return value;
 }
 
 // ---------------------------------------------------------------------------
