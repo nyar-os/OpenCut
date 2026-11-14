@@ -24,6 +24,8 @@ export type {
 } from './dsl.js';
 export type { AssetFingerprint, AudioLevel, BuildInfo, PreviewResult, RenderOptions, RenderResult, SceneSpan } from './native.js';
 export { native } from './native.js';
+export type { RenderCheck } from './verify.js';
+export { verifyRender } from './verify.js';
 export type * from './types.js';
 
 import { native } from './native.js';
