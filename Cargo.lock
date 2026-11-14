@@ -72,8 +72,8 @@ dependencies = [
 
 [[package]]
 name = "geometry"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry-motion",
  "geometry-types",
@@ -81,8 +81,8 @@ dependencies = [
 
 [[package]]
 name = "geometry-motion"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry-types",
  "serde",
@@ -90,20 +90,20 @@ dependencies = [
 
 [[package]]
 name = "geometry-types"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "hardware-program"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror",
 ]
 
 [[package]]
@@ -147,8 +147,8 @@ checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
 
 [[package]]
 name = "media"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "media-audio",
  "media-canvas",
@@ -172,8 +172,8 @@ dependencies = [
 
 [[package]]
 name = "media-audio"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "media-codec",
  "media-dsp",
@@ -184,8 +184,8 @@ dependencies = [
 
 [[package]]
 name = "media-canvas"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-image",
@@ -194,25 +194,25 @@ dependencies = [
 
 [[package]]
 name = "media-codec"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "media-image",
  "media-types",
  "media-vector",
  "media-voxel",
- "windows 0.58.0",
+ "windows 0.62.2",
 ]
 
 [[package]]
 name = "media-dsp"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 
 [[package]]
 name = "media-image"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry-types",
  "serde",
@@ -220,8 +220,8 @@ dependencies = [
 
 [[package]]
 name = "media-layout"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-image",
@@ -232,8 +232,8 @@ dependencies = [
 
 [[package]]
 name = "media-motion"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-types",
@@ -242,8 +242,8 @@ dependencies = [
 
 [[package]]
 name = "media-particles"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry-types",
  "media-image",
@@ -252,8 +252,8 @@ dependencies = [
 
 [[package]]
 name = "media-pixel"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "media-image",
  "media-types",
@@ -262,8 +262,8 @@ dependencies = [
 
 [[package]]
 name = "media-post"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry-motion",
  "geometry-types",
@@ -277,8 +277,8 @@ dependencies = [
 
 [[package]]
 name = "media-raster"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-image",
@@ -287,8 +287,8 @@ dependencies = [
 
 [[package]]
 name = "media-render"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-audio",
@@ -311,8 +311,8 @@ dependencies = [
 
 [[package]]
 name = "media-scene"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-image",
@@ -324,8 +324,8 @@ dependencies = [
 
 [[package]]
 name = "media-synthesis"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "media-dsp",
  "media-types",
@@ -334,8 +334,8 @@ dependencies = [
 
 [[package]]
 name = "media-text"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "fontdue",
  "geometry",
@@ -347,13 +347,13 @@ dependencies = [
 
 [[package]]
 name = "media-types"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 
 [[package]]
 name = "media-vector"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-types",
@@ -362,8 +362,8 @@ dependencies = [
 
 [[package]]
 name = "media-voice"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "media-dsp",
  "media-types",
@@ -372,8 +372,8 @@ dependencies = [
 
 [[package]]
 name = "media-voxel"
-version = "0.0.0"
-source = "git+https://github.com/muse-gpt/ucf.rs.git?rev=36015678136f9d755ec62651902d2d27f2bb2611#36015678136f9d755ec62651902d2d27f2bb2611"
+version = "0.1.0"
+source = "git+https://github.com/oovm/boost.rs.git?rev=c4ad7e17499170b38df42847996cdfe55bf58d38#c4ad7e17499170b38df42847996cdfe55bf58d38"
 dependencies = [
  "geometry",
  "media-types",
@@ -669,31 +669,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
-dependencies = [
- "thiserror-impl 1.0.69",
-]
-
-[[package]]
-name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
 dependencies = [
- "thiserror-impl 2.0.21",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.69"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "thiserror-impl",
 ]
 
 [[package]]
@@ -744,7 +724,7 @@ source = "git+https://github.com/doki-land/wae-framework.git?rev=66f5d003fec85e2
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 2.0.21",
+ "thiserror",
 ]
 
 [[package]]
@@ -772,7 +752,7 @@ source = "git+https://github.com/doki-land/wae-framework.git?rev=66f5d003fec85e2
 dependencies = [
  "serde",
  "serde_json",
- "thiserror 2.0.21",
+ "thiserror",
 ]
 
 [[package]]
@@ -821,8 +801,8 @@ dependencies = [
  "webview2-com-sys",
  "windows 0.61.3",
  "windows-core 0.61.2",
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
+ "windows-implement",
+ "windows-interface",
 ]
 
 [[package]]
@@ -842,19 +822,9 @@ version = "0.38.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "381336cfffd772377d291702245447a5251a2ffa5bad679c99e61bc48bacbf9c"
 dependencies = [
- "thiserror 2.0.21",
+ "thiserror",
  "windows 0.61.3",
  "windows-core 0.61.2",
-]
-
-[[package]]
-name = "windows"
-version = "0.58.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
-dependencies = [
- "windows-core 0.58.0",
- "windows-targets",
 ]
 
 [[package]]
@@ -863,11 +833,23 @@ version = "0.61.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9babd3a767a4c1aef6900409f85f5d53ce2544ccdfaa86dad48c91782c6d6893"
 dependencies = [
- "windows-collections",
+ "windows-collections 0.2.0",
  "windows-core 0.61.2",
- "windows-future",
+ "windows-future 0.2.1",
  "windows-link 0.1.3",
- "windows-numerics",
+ "windows-numerics 0.2.0",
+]
+
+[[package]]
+name = "windows"
+version = "0.62.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "527fadee13e0c05939a6a05d5bd6eec6cd2e3dbd648b9f8e447c6518133d8580"
+dependencies = [
+ "windows-collections 0.3.2",
+ "windows-core 0.62.2",
+ "windows-future 0.3.2",
+ "windows-numerics 0.3.1",
 ]
 
 [[package]]
@@ -880,16 +862,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-core"
-version = "0.58.0"
+name = "windows-collections"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
+checksum = "23b2d95af1a8a14a3c7367e1ed4fc9c20e0a26e79551b1454d72583c97cc6610"
 dependencies = [
- "windows-implement 0.58.0",
- "windows-interface 0.58.0",
- "windows-result 0.2.0",
- "windows-strings 0.1.0",
- "windows-targets",
+ "windows-core 0.62.2",
 ]
 
 [[package]]
@@ -898,11 +876,24 @@ version = "0.61.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0fdd3ddb90610c7638aa2b3a3ab2904fb9e5cdbecc643ddb3647212781c4ae3"
 dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
+ "windows-implement",
+ "windows-interface",
  "windows-link 0.1.3",
  "windows-result 0.3.4",
  "windows-strings 0.4.2",
+]
+
+[[package]]
+name = "windows-core"
+version = "0.62.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
+dependencies = [
+ "windows-implement",
+ "windows-interface",
+ "windows-link 0.2.1",
+ "windows-result 0.4.1",
+ "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -913,18 +904,18 @@ checksum = "fc6a41e98427b19fe4b73c550f060b59fa592d7d686537eebf9385621bfbad8e"
 dependencies = [
  "windows-core 0.61.2",
  "windows-link 0.1.3",
- "windows-threading",
+ "windows-threading 0.1.0",
 ]
 
 [[package]]
-name = "windows-implement"
-version = "0.58.0"
+name = "windows-future"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bbd5b46c938e506ecbce286b6628a02171d56153ba733b6c741fc627ec9579b"
+checksum = "e1d6f90251fe18a279739e78025bd6ddc52a7e22f921070ccdc67dde84c605cb"
 dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
+ "windows-core 0.62.2",
+ "windows-link 0.2.1",
+ "windows-threading 0.2.1",
 ]
 
 [[package]]
@@ -932,17 +923,6 @@ name = "windows-implement"
 version = "0.60.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.58.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -983,12 +963,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.2.0"
+name = "windows-numerics"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d1043d8214f791817bab27572aaa8af63732e11bf84aa21a45a78d6c317ae0e"
+checksum = "6e2e40844ac143cdb44aead537bbf727de9b044e107a0f1220392177d15b0f26"
 dependencies = [
- "windows-targets",
+ "windows-core 0.62.2",
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -1001,13 +982,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-strings"
-version = "0.1.0"
+name = "windows-result"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd9b125c486025df0eabcb585e62173c6c9eddcec5d117d3b6e8c30e2ee4d10"
+checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
 dependencies = [
- "windows-result 0.2.0",
- "windows-targets",
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -1020,19 +1000,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-targets"
-version = "0.52.6"
+name = "windows-strings"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973"
+checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
 dependencies = [
- "windows_aarch64_gnullvm",
- "windows_aarch64_msvc",
- "windows_i686_gnu",
- "windows_i686_gnullvm",
- "windows_i686_msvc",
- "windows_x86_64_gnu",
- "windows_x86_64_gnullvm",
- "windows_x86_64_msvc",
+ "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -1045,52 +1018,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows_aarch64_gnullvm"
-version = "0.52.6"
+name = "windows-threading"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32a4622180e7a0ec044bb555404c800bc9fd9ec262ec147edd5989ccd0c02cd3"
-
-[[package]]
-name = "windows_aarch64_msvc"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09ec2a7bb152e2252b53fa7803150007879548bc709c039df7627cabbd05d469"
-
-[[package]]
-name = "windows_i686_gnu"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e9b5ad5ab802e97eb8e295ac6720e509ee4c243f69d781394014ebfe8bbfa0b"
-
-[[package]]
-name = "windows_i686_gnullvm"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eee52d38c090b3caa76c563b86c3a4bd71ef1a819287c19d586d7334ae8ed66"
-
-[[package]]
-name = "windows_i686_msvc"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "240948bc05c5e7c6dabba28bf89d89ffce3e303022809e73deaefe4f6ec56c66"
-
-[[package]]
-name = "windows_x86_64_gnu"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "147a5c80aabfbf0c7d901cb5895d1de30ef2907eb21fbbab29ca94c5b08b1a78"
-
-[[package]]
-name = "windows_x86_64_gnullvm"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d"
-
-[[package]]
-name = "windows_x86_64_msvc"
-version = "0.52.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+checksum = "3949bd5b99cafdf1c7ca86b43ca564028dfe27d66958f2470940f73d86d75b37"
+dependencies = [
+ "windows-link 0.2.1",
+]
 
 [[package]]
 name = "zmij"
