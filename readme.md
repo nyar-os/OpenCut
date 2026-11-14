@@ -78,18 +78,24 @@ given frame offset. Narration itself is never synthesized — but singing is.
 film.audio({ bgm: { volume: 0.17 }, narration: { wav: 'voice.wav', delay: 0.5 }, sfx: [...] });
 ```
 
-## Sound effects and singing are synthesized
+## Sound effects, instruments and singing are synthesized
 
-Both halves of the sound pair come from the shared core; no audio asset is
-needed. Effects name a family (`whoosh`, `impact`, `riser`, `tick`, `glitch`,
-`sub`, `ambience`, `sparkle`) or a catalogue preset (`impact-deep`,
-`riser-tension`, …), and a song is a syllable list sung by `media.voice`:
+All three sound paths come from the shared core; no audio asset is needed.
+Effects name a family (`whoosh`, `impact`, `riser`, `tick`, `glitch`, `sub`,
+`ambience`, `sparkle`) or a catalogue preset; notes play one of 17 instruments
+(9 drums, 8 pitched); patterns play a drum groove; and a song is a syllable
+list sung by `media.voice`:
 
 ```ts
 film.audio({
     sfx: [
         { at: 0, preset: 'impact-deep', volume: 0.5 },
         { at: 3, kind: 'whoosh', pitch: 1.3, brightness: 0.8 },
+    ],
+    patterns: [{ at: 0, preset: 'four-on-floor', bpm: 120, bars: 2, volume: 0.8 }],
+    notes: [
+        { at: 0, instrument: 'bass', note: 36, duration: 0.6, velocity: 0.7 },
+        { at: 0, instrument: 'pad', note: 48, duration: 3.8, velocity: 0.35 },
     ],
     voice: [{
         at: 2.6,
@@ -106,14 +112,18 @@ film.audio({
 
 - `kind` and `preset` are mutually exclusive; unknown names and out-of-range
   parameters are explicit errors, never silent substitutions.
+- Instruments: `kick`, `snare`, `clap`, `hat-closed`, `hat-open`, `tom`, `rim`,
+  `shaker`, `crash`, `bass`, `pluck`, `pad`, `lead`, `bell`, `marimba`, `keys`,
+  `strings`. `note` is a MIDI number (A4 = 69), `velocity` the hit gain.
+- Grooves: `four-on-floor`, `breakbeat`, `trap`, `rock`, `half-time`, `bossa`,
+  `lofi`, `dnb` — or `tracks` with 16 step velocities per bar.
 - Effect parameters (`duration`, `pitch`, `brightness`, `intensity`, `pan`,
   `seed`) override the resolved base spec; omitted fields keep family/preset
   defaults.
 - A song uses the five vowels (`a e i o u`), onset classes (`s t n r w y f`),
   pitch in Hz and duration in beats; the same song and `seed` always render
   byte-identically.
-- `films/voice-sfx.ts` is the reference: 8 seconds of effects plus a sung
-  line, rendered without any audio file.
+- `films/voice-sfx.ts` and `films/groove.ts` are the reference films.
 
 ## Scope today
 

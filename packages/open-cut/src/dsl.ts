@@ -6,7 +6,7 @@
  */
 import { native } from './native.js';
 import type { RenderResult } from './native.js';
-import type { AudioSpec, Background, CodeTheme, Item, Project, SfxInput, VoiceInput } from './types.js';
+import type { AudioSpec, Background, CodeTheme, Item, NoteInput, PatternInput, Project, SfxInput, VoiceInput } from './types.js';
 
 export type Ease =
     | 'linear'
@@ -94,15 +94,17 @@ export class Film {
         return this;
     }
 
-    /** Sets the audio bed. `sfx.at`, `voice.at`, clip times and narration
-     *  delay are in seconds here; the compiler converts them to frames for the
-     *  IR. Effects and songs are synthesized by the core (`media.synthesis` /
-     *  `media.voice`); audio files are only decoded, never generated. */
+    /** Sets the audio bed. `sfx.at`, `voice.at`, `notes.at`, `patterns.at`,
+     *  clip times and narration delay are in seconds here; the compiler
+     *  converts them to frames for the IR. Effects, songs, instruments and
+     *  grooves are synthesized by the core; audio files are only decoded. */
     audio(spec: {
         bgm?: { volume?: number; mood?: string } | null;
         narration?: { wav: string; delay?: number; volume?: number } | null;
         sfx?: SfxInput[];
         voice?: VoiceInput[];
+        notes?: NoteInput[];
+        patterns?: PatternInput[];
         clips?: Array<{ src: string; at?: number; dur?: number; offset?: number; volume?: number }>;
     }): this {
         this.audioSpec = {
@@ -112,6 +114,8 @@ export class Film {
                 : null,
             sfx: (spec.sfx ?? []).map((sfx) => ({ ...sfx, at: frames(sfx.at, this.fps) })),
             voice: (spec.voice ?? []).map((voice) => ({ ...voice, at: frames(voice.at, this.fps) })),
+            notes: (spec.notes ?? []).map((note) => ({ ...note, at: frames(note.at, this.fps) })),
+            patterns: (spec.patterns ?? []).map((pattern) => ({ ...pattern, at: frames(pattern.at, this.fps) })),
             clips: (spec.clips ?? []).map((clip) => ({
                 src: clip.src,
                 at: frames(clip.at ?? 0, this.fps),

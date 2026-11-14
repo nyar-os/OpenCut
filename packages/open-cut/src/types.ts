@@ -259,6 +259,63 @@ export interface VoicePlacementSpec {
     song: VoiceSpec;
 }
 
+/** Every playable instrument of the shared synthesis core. */
+export type InstrumentName =
+    | 'kick'
+    | 'snare'
+    | 'clap'
+    | 'hat-closed'
+    | 'hat-open'
+    | 'tom'
+    | 'rim'
+    | 'shaker'
+    | 'crash'
+    | 'bass'
+    | 'pluck'
+    | 'pad'
+    | 'lead'
+    | 'bell'
+    | 'marimba'
+    | 'keys'
+    | 'strings';
+
+/** One instrument hit placed at `at` frames (`note` is a MIDI number). */
+export interface NoteSpec {
+    at: number;
+    instrument: InstrumentName;
+    note?: number;
+    duration?: number;
+    velocity?: number;
+    tone?: number;
+    decay?: number;
+    pan?: number;
+    seed?: number;
+}
+
+/** One custom groove track: step velocities, 0 is a rest. */
+export interface PatternTrackSpec {
+    instrument: InstrumentName;
+    note?: number;
+    steps: number[];
+    tone?: number;
+    decay?: number;
+    pan?: number;
+}
+
+/** One drum groove: a shipped preset or custom tracks. */
+export interface PatternSpec {
+    at: number;
+    preset?: string;
+    bpm?: number;
+    bars?: number;
+    tracks?: PatternTrackSpec[];
+    volume?: number;
+}
+
+/** Note input in the authoring surface (`at` in seconds). */
+export type NoteInput = NoteSpec;
+/** Groove input in the authoring surface (`at` in seconds). */
+export type PatternInput = PatternSpec;
 /** Effect input in the authoring surface (`at` in seconds). */
 export type SfxInput = SfxSpec;
 /** Voice input in the authoring surface (`at` in seconds). */
@@ -278,6 +335,10 @@ export interface AudioSpec {
     sfx?: SfxSpec[];
     /** Synthesized songs mixed into the bed. */
     voice?: VoicePlacementSpec[];
+    /** One-shot instruments mixed into the bed. */
+    notes?: NoteSpec[];
+    /** Drum grooves mixed into the bed. */
+    patterns?: PatternSpec[];
     /** Imported audio placed on the timeline. */
     clips?: AudioClipSpec[];
 }
