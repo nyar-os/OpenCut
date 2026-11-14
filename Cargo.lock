@@ -89,6 +89,18 @@ dependencies = [
 [[package]]
 name = "geometry-types"
 version = "0.0.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "hardware-program"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "hashbrown"
@@ -134,12 +146,23 @@ name = "media"
 version = "0.0.0"
 dependencies = [
  "media-audio",
+ "media-canvas",
  "media-codec",
+ "media-dsp",
+ "media-image",
+ "media-layout",
+ "media-particles",
+ "media-pixel",
+ "media-post",
  "media-raster",
  "media-render",
  "media-scene",
+ "media-synthesis",
  "media-text",
  "media-types",
+ "media-vector",
+ "media-voice",
+ "media-voxel",
 ]
 
 [[package]]
@@ -147,17 +170,85 @@ name = "media-audio"
 version = "0.0.0"
 dependencies = [
  "media-codec",
- "media-scene",
+ "media-dsp",
+ "media-synthesis",
  "media-types",
+ "media-voice",
+]
+
+[[package]]
+name = "media-canvas"
+version = "0.0.0"
+dependencies = [
+ "geometry",
+ "media-image",
+ "media-raster",
 ]
 
 [[package]]
 name = "media-codec"
 version = "0.0.0"
 dependencies = [
- "media-raster",
+ "media-image",
  "media-types",
+ "media-vector",
+ "media-voxel",
  "windows 0.58.0",
+]
+
+[[package]]
+name = "media-dsp"
+version = "0.0.0"
+
+[[package]]
+name = "media-image"
+version = "0.0.0"
+dependencies = [
+ "geometry-types",
+ "serde",
+]
+
+[[package]]
+name = "media-layout"
+version = "0.0.0"
+dependencies = [
+ "geometry",
+ "media-image",
+ "media-text",
+ "media-types",
+ "serde",
+]
+
+[[package]]
+name = "media-particles"
+version = "0.0.0"
+dependencies = [
+ "geometry-types",
+ "media-image",
+ "media-types",
+]
+
+[[package]]
+name = "media-pixel"
+version = "0.0.0"
+dependencies = [
+ "media-image",
+ "media-types",
+ "serde",
+]
+
+[[package]]
+name = "media-post"
+version = "0.0.0"
+dependencies = [
+ "geometry-motion",
+ "geometry-types",
+ "hardware-program",
+ "media-image",
+ "media-particles",
+ "media-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -165,7 +256,7 @@ name = "media-raster"
 version = "0.0.0"
 dependencies = [
  "geometry",
- "media-scene",
+ "media-image",
  "media-types",
 ]
 
@@ -176,10 +267,17 @@ dependencies = [
  "geometry",
  "media-audio",
  "media-codec",
+ "media-image",
+ "media-layout",
+ "media-post",
  "media-raster",
  "media-scene",
+ "media-synthesis",
  "media-text",
  "media-types",
+ "media-vector",
+ "media-voice",
+ "media-voxel",
  "serde",
  "serde_json",
 ]
@@ -189,6 +287,18 @@ name = "media-scene"
 version = "0.0.0"
 dependencies = [
  "geometry",
+ "media-image",
+ "media-types",
+ "media-voice",
+ "serde",
+]
+
+[[package]]
+name = "media-synthesis"
+version = "0.0.0"
+dependencies = [
+ "media-dsp",
+ "media-types",
  "serde",
 ]
 
@@ -198,6 +308,7 @@ version = "0.0.0"
 dependencies = [
  "fontdue",
  "geometry",
+ "media-image",
  "media-raster",
  "media-scene",
  "media-types",
@@ -206,6 +317,33 @@ dependencies = [
 [[package]]
 name = "media-types"
 version = "0.0.0"
+
+[[package]]
+name = "media-vector"
+version = "0.0.0"
+dependencies = [
+ "geometry",
+ "media-types",
+ "serde",
+]
+
+[[package]]
+name = "media-voice"
+version = "0.0.0"
+dependencies = [
+ "media-dsp",
+ "media-types",
+ "serde",
+]
+
+[[package]]
+name = "media-voxel"
+version = "0.0.0"
+dependencies = [
+ "geometry",
+ "media-types",
+ "serde",
+]
 
 [[package]]
 name = "memchr"
@@ -496,11 +634,31 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6aaf5339b578ea85b50e080feb250a3e8ae8cfcdff9a461c9ec2904bc923f52"
+dependencies = [
+ "thiserror-impl 1.0.69",
+]
+
+[[package]]
+name = "thiserror"
 version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 2.0.21",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -551,7 +709,7 @@ source = "git+https://github.com/doki-land/wae-framework.git?rev=66f5d003fec85e2
 dependencies = [
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -579,7 +737,7 @@ source = "git+https://github.com/doki-land/wae-framework.git?rev=66f5d003fec85e2
 dependencies = [
  "serde",
  "serde_json",
- "thiserror",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -649,7 +807,7 @@ version = "0.38.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "381336cfffd772377d291702245447a5251a2ffa5bad679c99e61bc48bacbf9c"
 dependencies = [
- "thiserror",
+ "thiserror 2.0.21",
  "windows 0.61.3",
  "windows-core 0.61.2",
 ]

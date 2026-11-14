@@ -205,11 +205,64 @@ export interface NarrationSpec {
     volume?: number;
 }
 
+/** The eight synthesized effect families of the shared sound core. */
+export type SfxFamily = 'whoosh' | 'impact' | 'riser' | 'tick' | 'glitch' | 'sub' | 'ambience' | 'sparkle';
+
+/**
+ * One synthesized effect placed at `at` frames. Name either `kind` (a family)
+ * or `preset` (a catalogue name) — never both — and any optional parameter
+ * overrides the resolved base spec.
+ */
 export interface SfxSpec {
     at: number;
-    kind: 'whoosh' | 'tick' | 'impact';
     volume?: number;
+    kind?: SfxFamily;
+    preset?: string;
+    duration?: number;
+    pitch?: number;
+    brightness?: number;
+    intensity?: number;
+    pan?: number;
+    seed?: number;
 }
+
+/** The five contracted vowels of the singing voice. */
+export type Vowel = 'a' | 'e' | 'i' | 'o' | 'u';
+
+/** Syllable-onset consonant classes (fricative, plosive, nasal, glide). */
+export type Onset = 's' | 't' | 'n' | 'r' | 'w' | 'y' | 'f';
+
+export interface Syllable {
+    onset?: Onset;
+    vowel: Vowel;
+    /** Fundamental frequency in Hz, 40..1200. */
+    pitch: number;
+    /** Duration in beats at the song tempo, 0.05..8. */
+    beats: number;
+}
+
+/** The `media.voice` song contract, unchanged by the film IR. */
+export interface VoiceSpec {
+    syllables: Syllable[];
+    /** Tempo in beats per minute, 20..400. */
+    tempoBpm?: number;
+    vibrato?: { rateHz: number; depth: number; delayS: number };
+    breath?: number;
+    volume?: number;
+    seed?: number;
+}
+
+/** One synthesized song placed at `at` frames. */
+export interface VoicePlacementSpec {
+    at: number;
+    volume?: number;
+    song: VoiceSpec;
+}
+
+/** Effect input in the authoring surface (`at` in seconds). */
+export type SfxInput = SfxSpec;
+/** Voice input in the authoring surface (`at` in seconds). */
+export type VoiceInput = VoicePlacementSpec;
 
 export interface AudioClipSpec {
     src: string;
@@ -223,6 +276,8 @@ export interface AudioSpec {
     bgm?: BgmSpec | null;
     narration?: NarrationSpec | null;
     sfx?: SfxSpec[];
+    /** Synthesized songs mixed into the bed. */
+    voice?: VoicePlacementSpec[];
     /** Imported audio placed on the timeline. */
     clips?: AudioClipSpec[];
 }

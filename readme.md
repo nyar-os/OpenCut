@@ -72,18 +72,56 @@ film.audio({ clips: [{ src: 'beat.wav', at: 21, volume: 0.9 }] });
 ## Narration is a slot, not a generator
 
 The pipeline reserves a narration track and mixes a PCM16 WAV you supply at a
-given frame offset. Nothing in OpenCut synthesizes speech.
+given frame offset. Narration itself is never synthesized — but singing is.
 
 ```ts
 film.audio({ bgm: { volume: 0.17 }, narration: { wav: 'voice.wav', delay: 0.5 }, sfx: [...] });
 ```
 
+## Sound effects and singing are synthesized
+
+Both halves of the sound pair come from the shared core; no audio asset is
+needed. Effects name a family (`whoosh`, `impact`, `riser`, `tick`, `glitch`,
+`sub`, `ambience`, `sparkle`) or a catalogue preset (`impact-deep`,
+`riser-tension`, …), and a song is a syllable list sung by `media.voice`:
+
+```ts
+film.audio({
+    sfx: [
+        { at: 0, preset: 'impact-deep', volume: 0.5 },
+        { at: 3, kind: 'whoosh', pitch: 1.3, brightness: 0.8 },
+    ],
+    voice: [{
+        at: 2.6,
+        song: {
+            tempoBpm: 100,
+            syllables: [
+                { onset: 'r', vowel: 'a', pitch: 392, beats: 1 },
+                { vowel: 'o', pitch: 440, beats: 1 },
+            ],
+        },
+    }],
+});
+```
+
+- `kind` and `preset` are mutually exclusive; unknown names and out-of-range
+  parameters are explicit errors, never silent substitutions.
+- Effect parameters (`duration`, `pitch`, `brightness`, `intensity`, `pan`,
+  `seed`) override the resolved base spec; omitted fields keep family/preset
+  defaults.
+- A song uses the five vowels (`a e i o u`), onset classes (`s t n r w y f`),
+  pitch in Hz and duration in beats; the same song and `seed` always render
+  byte-identically.
+- `films/voice-sfx.ts` is the reference: 8 seconds of effects plus a sung
+  line, rendered without any audio file.
+
 ## Scope today
 
 Supported: fixed-timeline scenes, text/code/counter/card/shape/footnote/
 progress items, image and video clips with fit modes, imported audio, starfield
-and gradient backgrounds, synthesized bed, MP4 out.
+and gradient backgrounds, synthesized effects and singing, MP4 out.
 
 Not yet: property keyframes and easing on arbitrary fields, transitions,
 multi-track compositing (items paint in list order, one scene at a time),
-audio apart from the mixed bed, non-Windows decoders and encoders.
+lyrics/phoneme tracks beyond the contracted vowel and onset classes, speech
+narration synthesis, non-Windows decoders and encoders.

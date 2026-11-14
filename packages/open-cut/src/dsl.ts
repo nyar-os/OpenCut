@@ -6,7 +6,7 @@
  */
 import { native } from './native.js';
 import type { RenderResult } from './native.js';
-import type { AudioSpec, Background, CodeTheme, Item, Project } from './types.js';
+import type { AudioSpec, Background, CodeTheme, Item, Project, SfxInput, VoiceInput } from './types.js';
 
 export type Ease =
     | 'linear'
@@ -94,13 +94,15 @@ export class Film {
         return this;
     }
 
-    /** Sets the audio bed. `sfx.at`, clip times and narration delay are in
-     *  seconds here; the compiler converts them to frames for the IR. Audio
-     *  files are decoded by the core, never generated. */
+    /** Sets the audio bed. `sfx.at`, `voice.at`, clip times and narration
+     *  delay are in seconds here; the compiler converts them to frames for the
+     *  IR. Effects and songs are synthesized by the core (`media.synthesis` /
+     *  `media.voice`); audio files are only decoded, never generated. */
     audio(spec: {
         bgm?: { volume?: number; mood?: string } | null;
         narration?: { wav: string; delay?: number; volume?: number } | null;
-        sfx?: Array<{ at: number; kind: 'whoosh' | 'tick' | 'impact'; volume?: number }>;
+        sfx?: SfxInput[];
+        voice?: VoiceInput[];
         clips?: Array<{ src: string; at?: number; dur?: number; offset?: number; volume?: number }>;
     }): this {
         this.audioSpec = {
@@ -109,6 +111,7 @@ export class Film {
                 ? { wav: spec.narration.wav, delayFrames: frames(spec.narration.delay ?? 0, this.fps), volume: spec.narration.volume }
                 : null,
             sfx: (spec.sfx ?? []).map((sfx) => ({ ...sfx, at: frames(sfx.at, this.fps) })),
+            voice: (spec.voice ?? []).map((voice) => ({ ...voice, at: frames(voice.at, this.fps) })),
             clips: (spec.clips ?? []).map((clip) => ({
                 src: clip.src,
                 at: frames(clip.at ?? 0, this.fps),
