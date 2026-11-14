@@ -7,6 +7,7 @@
  *   open-cut verify <film.mjs|film.ts> --out file.mp4 [--json]
  *   open-cut preview <film.mjs|film.ts> --frame N --out file.png [--json]
  *   open-cut preview <film.mjs|film.ts> --at seconds --out file.png [--json]
+ *   open-cut preview <film.mjs|film.ts> --from s --to s --out dir [--json]
  *   open-cut build [--json]
  *   open-cut version
  *
@@ -16,6 +17,7 @@
  * that file stops the run without touching the previous output.
  * Exit codes: 0 success, 1 runtime failure, 2 usage error.
  */
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { Film } from './dsl.js';
@@ -38,11 +40,20 @@ function flag(args: string[], name: string): string | undefined {
     return value;
 }
 
+/** Converts a non-negative seconds flag into a rounded frame index. */
+function secondsToFrame(value: string, fps: number, name: string): number {
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        fail(`${name} must be a non-negative number of seconds, got ${value}`, 2);
+    }
+    return Math.round(seconds * fps);
+}
+
 const args = process.argv.slice(2);
 const command = args[0];
 
 if (command === 'version' || command === undefined) {
-    console.log(command === undefined ? 'usage: open-cut render <film> [--out file.mp4] | open-cut verify <film> --out file.mp4 | open-cut build | open-cut version' : nativeVersion());
+    console.log(command === undefined ? 'usage: open-cut render <film> [--out file.mp4] | open-cut verify <film> --out file.mp4 | open-cut preview <film> --frame N --out file.png | open-cut build | open-cut version' : nativeVersion());
     process.exit(command === undefined ? 2 : 0);
 }
 
@@ -66,9 +77,17 @@ if (command === 'preview') {
     const atArg = flag(args, '--at');
     const outArg = flag(args, '--out');
     if (outArg === undefined) {
-        fail('preview requires --out <file.png> and either --frame <index> or --at <seconds>', 2);
+        fail('preview requires --out <file.png> and either --frame <index>, --at <seconds> or --from/--to', 2);
     }
-    if ((frameArg === undefined) === (atArg === undefined)) {
+    const fromArg = flag(args, '--from');
+    const toArg = flag(args, '--to');
+    if ((fromArg === undefined) !== (toArg === undefined)) {
+        fail('--from and --to must be given together', 2);
+    }
+    if (fromArg !== undefined && (frameArg !== undefined || atArg !== undefined)) {
+        fail('preview takes either --frame/--at or --from/--to, not both', 2);
+    }
+    if (fromArg === undefined && (frameArg === undefined) === (atArg === undefined)) {
         fail('preview takes exactly one of --frame <index> or --at <seconds>', 2);
     }
     const module = await import(pathToFileURL(path.resolve(script)).href);
@@ -76,16 +95,34 @@ if (command === 'preview') {
     if (!(film instanceof Film)) {
         fail('the film module must default-export a Film instance', 2);
     }
-    const frame =
-        atArg !== undefined
-            ? (() => {
-                  const seconds = Number(atArg);
-                  if (!Number.isFinite(seconds) || seconds < 0) {
-                      fail(`--at must be a non-negative number of seconds, got ${atArg}`, 2);
-                  }
-                  return Math.round(seconds * film.fps);
-              })()
-            : Math.round(Number(frameArg));
+    if (fromArg !== undefined && toArg !== undefined) {
+        // An interval preview is a frame sequence: `--out` is the directory and
+        // frames are numbered from zero like `render --from/--to`.
+        const start = secondsToFrame(fromArg, film.fps, '--from');
+        const end = secondsToFrame(toArg, film.fps, '--to');
+        if (end <= start) {
+            fail(`preview --from ${fromArg} must be earlier than --to ${toArg}`, 2);
+        }
+        const dir = path.resolve(outArg);
+        mkdirSync(dir, { recursive: true });
+        const frames: unknown[] = [];
+        try {
+            for (let frame = start; frame < end; frame += 1) {
+                const name = `frame-${String(frame - start).padStart(4, '0')}.png`;
+                frames.push(film.preview(frame, path.join(dir, name)));
+            }
+        }
+        catch (error) {
+            fail(error instanceof Error ? error.message : String(error), 1);
+        }
+        if (args.includes('--json')) {
+            console.log(JSON.stringify({ dir, startFrame: start, endFrame: end, frames }, null, 2));
+            process.exit(0);
+        }
+        console.log(`frames ${start}..${end} (${frames.length} files) -> ${outArg}`);
+        process.exit(0);
+    }
+    const frame = atArg !== undefined ? secondsToFrame(atArg, film.fps, '--at') : Math.round(Number(frameArg));
     try {
         const stats = film.preview(frame, path.resolve(outArg));
         if (args.includes('--json')) {
