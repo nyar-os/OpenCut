@@ -31,8 +31,22 @@ export interface RenderResult {
     fontHashes: string[];
     /** FNV-1a hash of the project JSON that produced the file. */
     projectHash: string;
+    /** External files the render loaded, with byte length and hash. */
+    assets: AssetFingerprint[];
     /** Declared optional resources that stayed empty. */
     optionalMissing: string[];
+}
+
+/** One external file a render loaded, fingerprinted from its bytes. */
+export interface AssetFingerprint {
+    /** How the project uses the file: `image`, `video`, `audio` or `narration`. */
+    kind: string;
+    /** The path as declared in the project. */
+    path: string;
+    /** Byte length of the loaded file. */
+    bytes: number;
+    /** FNV-1a hash of the loaded bytes. */
+    hash: string;
 }
 
 export interface RenderOptions {

@@ -129,6 +129,7 @@ console.log(
         `[${stats.backend}, ${Math.round(stats.bytes / 1024)} KiB, project ${stats.projectHash}]`,
 );
 console.log(`fonts: ${stats.fonts.join(', ')}`);
+console.log(`assets: ${stats.assets.length} fingerprinted`);
 if (stats.optionalMissing.length > 0) {
     console.log(`optional slots left empty: ${stats.optionalMissing.join(', ')}`);
 }

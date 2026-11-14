@@ -147,6 +147,7 @@ fn to_json(stats: &RenderStats) -> serde_json::Value {
         "fonts": stats.fonts,
         "fontHashes": stats.font_hashes,
         "projectHash": stats.project_hash,
+        "assets": stats.assets,
         "optionalMissing": stats.optional_missing,
     })
 }
