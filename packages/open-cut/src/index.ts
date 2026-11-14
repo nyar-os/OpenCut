@@ -20,13 +20,19 @@ export type {
     ShapeOptions,
     TextOptions,
 } from './dsl.js';
-export type { RenderResult } from './native.js';
+export type { BuildInfo, RenderOptions, RenderResult } from './native.js';
 export { native } from './native.js';
 export type * from './types.js';
 
 import { native } from './native.js';
+import type { BuildInfo } from './native.js';
 
 /** Native library version reported by the Rust core binding. */
 export function nativeVersion(): string {
     return native.version();
+}
+
+/** Source revision and profile this native binary was built from. */
+export function nativeBuild(): BuildInfo {
+    return native.build();
 }

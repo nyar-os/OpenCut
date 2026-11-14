@@ -5,8 +5,8 @@
  * compiled artifact.
  */
 import { native } from './native.js';
-import type { RenderResult } from './native.js';
-import type { AudioSpec, Background, CodeTheme, Item, NoteInput, PatternInput, Project, SfxInput, VoiceInput } from './types.js';
+import type { RenderOptions, RenderResult } from './native.js';
+import type { AudioSpec, Background, CodeTheme, FontsSpec, Item, NoteInput, PatternInput, PostSpec, Project, SfxInput, VoiceInput } from './types.js';
 
 export type Ease =
     | 'linear'
@@ -23,6 +23,10 @@ export interface FilmOptions {
     width?: number;
     height?: number;
     fps?: number;
+    /** Visual controls. `vignette` is off unless declared here. */
+    post?: PostSpec;
+    /** Explicit font files; omit to let the host discover them and report them. */
+    fonts?: FontsSpec;
 }
 
 interface TimedInput {
@@ -63,8 +67,10 @@ function compileItem(item: ItemInput, fps: number, sceneSeconds: number): Item {
     const out: Record<string, unknown> = { ...item };
     out['at'] = frames((item.at ?? 0) as number, fps);
     out['dur'] = Math.max(1, frames((item.dur ?? sceneSeconds) as number, fps));
-    out['fadeIn'] = Math.max(1, frames((item.fadeIn ?? DEFAULT_FADE) as number, fps));
-    out['fadeOut'] = Math.max(1, frames((item.fadeOut ?? DEFAULT_FADE) as number, fps));
+    // Zero is a real value: a fade of 0 means "no fade", so an author can cut
+    // exactly on a frame instead of getting an implicit one-frame ramp.
+    out['fadeIn'] = Math.max(0, frames((item.fadeIn ?? DEFAULT_FADE) as number, fps));
+    out['fadeOut'] = Math.max(0, frames((item.fadeOut ?? DEFAULT_FADE) as number, fps));
     // A layer's children keep their own (layer-relative) timing, in seconds.
     if (item.kind === 'layer' && Array.isArray(item['items'])) {
         const children = item['items'] as ItemInput[];
@@ -78,6 +84,8 @@ export class Film {
     readonly width: number;
     readonly height: number;
     readonly fps: number;
+    private readonly post: PostSpec;
+    private readonly fonts: FontsSpec | null;
     private readonly sceneList: SceneInput[] = [];
     private audioSpec: AudioSpec | null = null;
     private cameraKeys: Array<{ at: number; zoom: number; focus: [number, number]; rotate: number; ease: Ease }> = [];
@@ -86,6 +94,8 @@ export class Film {
         this.width = options.width ?? 1920;
         this.height = options.height ?? 1080;
         this.fps = options.fps ?? 30;
+        this.post = options.post ?? {};
+        this.fonts = options.fonts ?? null;
     }
 
     /** Appends a scene; scenes run back to back in call order. */
@@ -105,7 +115,7 @@ export class Film {
         voice?: VoiceInput[];
         notes?: NoteInput[];
         patterns?: PatternInput[];
-        clips?: Array<{ src: string; at?: number; dur?: number; offset?: number; volume?: number }>;
+        clips?: Array<{ src: string; at?: number; dur?: number; offset?: number; volume?: number; required?: boolean }>;
     }): this {
         this.audioSpec = {
             bgm: spec.bgm,
@@ -122,6 +132,7 @@ export class Film {
                 dur: clip.dur === undefined ? null : frames(clip.dur, this.fps),
                 offsetFrames: frames(clip.offset ?? 0, this.fps),
                 volume: clip.volume,
+                required: clip.required,
             })),
         };
         return this;
@@ -177,12 +188,24 @@ export class Film {
             scenes,
             audio: this.audioSpec,
             camera: this.cameraKeys,
+            post: this.post,
+            fonts: this.fonts,
         };
     }
 
-    /** Renders the compiled project into `outPath` (MP4). */
-    render(outPath: string): RenderResult {
-        return native.renderProject({ project: JSON.stringify(toWire(this.toProject())), out: outPath });
+    /** Renders the compiled project into `outPath` (MP4).
+     *
+     * `startFrame`/`endFrame` export a half-open interval (renumbered from
+     * zero); `cancelFile` is polled between frames so another process can stop
+     * the run, which then publishes nothing and keeps the previous file. */
+    render(outPath: string, options: RenderOptions = {}): RenderResult {
+        return native.renderProject({
+            project: JSON.stringify(toWire(this.toProject())),
+            out: outPath,
+            startFrame: options.startFrame,
+            endFrame: options.endFrame,
+            cancelFile: options.cancelFile,
+        });
     }
 }
 
@@ -445,6 +468,8 @@ export function image(options: {
     radius?: number;
     fadeIn?: number;
     fadeOut?: number;
+    /** `false` marks a documented empty slot; the default must decode. */
+    required?: boolean;
 }): ItemInput {
     return { kind: 'image', x: 0.5, y: 0.5, w: 0.4, h: 0.4, fit: 'contain', opacity: 1, dur: options.dur ?? 4, ...options } as ItemInput;
 }
@@ -464,6 +489,7 @@ export function video(options: {
     radius?: number;
     fadeIn?: number;
     fadeOut?: number;
+    required?: boolean;
 }): ItemInput {
     return { kind: 'video', x: 0.5, y: 0.5, w: 0.4, h: 0.4, fit: 'contain', opacity: 1, dur: options.dur ?? 4, ...options } as ItemInput;
 }

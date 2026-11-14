@@ -23,11 +23,36 @@ export interface RenderResult {
     bytes: number;
     backend: string;
     audio: boolean;
+    /** Half-open frame range written, in project frames. */
+    range: [number, number];
+    /** Font files the render loaded, in role order. */
+    fonts: string[];
+    /** FNV-1a hash of the project JSON that produced the file. */
+    projectHash: string;
+    /** Declared optional resources that stayed empty. */
+    optionalMissing: string[];
+}
+
+export interface RenderOptions {
+    /** First project frame to write; frames are renumbered from zero. */
+    startFrame?: number;
+    /** Exclusive end frame. Required when `startFrame` is set. */
+    endFrame?: number;
+    /** Path polled between frames: creating it cancels the run. */
+    cancelFile?: string;
+}
+
+export interface BuildInfo {
+    version: string;
+    sourceRev: string;
+    dirty: boolean;
+    profile: string;
 }
 
 export interface NativeBinding {
     version(): string;
-    renderProject(options: { project: string; out: string }): RenderResult;
+    build(): BuildInfo;
+    renderProject(options: { project: string; out: string } & RenderOptions): RenderResult;
 }
 
 const PLATFORM_PACKAGE = '@wae/open-cut-win32-x64';

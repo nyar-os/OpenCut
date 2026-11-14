@@ -15,10 +15,9 @@ repository = "https://github.com/nyar-os/OpenCut"
 serde_json = "1"
 # Cross-repo git dependencies must pin the full 40-character revision.
 wae = { git = "https://github.com/doki-land/wae-framework.git", rev = "66f5d003fec85e28503968fd0a6a271beef0f389" }
-# The renderer lives upstream. Local development resolves it by path; the
-# published revision to pin is 371e65be511acab0cfbc4356d60ccca8384c329c:
-# media = { git = "https://github.com/muse-gpt/ucf.rs.git", rev = "371e65be511acab0cfbc4356d60ccca8384c329c" }
-media = { path = "../../多媒体研究/media.rs/projects/media/media" }
+# The renderer lives upstream. The revision is pinned to a full 40-character
+# commit so any checkout resolves the exact same source; bump it deliberately.
+media = { git = "https://github.com/muse-gpt/ucf.rs.git", rev = "2d51a0996f8c7815aa127afb8fe9a64c60eb2cd0" }
 
 [profile.release]
 lto = true

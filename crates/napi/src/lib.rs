@@ -6,7 +6,7 @@
 
 #![deny(missing_docs)]
 
-use media::render::RenderStats;
+use media::render::{FrameRange, RenderOptions, RenderStats};
 use serde_json::json;
 use wae::{CallContext, Env, Error, JsValue, Result, function, register_module};
 
@@ -16,10 +16,33 @@ fn version(ctx: CallContext) -> Result<JsValue> {
     ctx.env().string(env!("CARGO_PKG_VERSION"))
 }
 
+/// Build provenance of this binary: crate version and source revision.
+///
+/// `sourceRev` is the commit the addon was compiled from (`unknown` when the
+/// build ran outside a checkout) and `dirty` says whether that tree had
+/// uncommitted changes. The upstream `media` revision is pinned in
+/// `Cargo.lock`, not guessed here.
+#[function]
+fn build(ctx: CallContext) -> Result<JsValue> {
+    json_to_js(
+        ctx.env(),
+        &json!({
+            "version": env!("CARGO_PKG_VERSION"),
+            "sourceRev": env!("OPEN_CUT_SOURCE_REV"),
+            "dirty": env!("OPEN_CUT_SOURCE_DIRTY") == "true",
+            "profile": if cfg!(debug_assertions) { "debug" } else { "release" },
+        }),
+    )
+}
+
 /// Render a project JSON string into an MP4 file.
 ///
-/// Argument: `{ project: string, out: string }`. Returns render statistics.
-/// Rendering is synchronous on the calling thread and logs progress to stdout.
+/// Argument: `{ project, out, startFrame?, endFrame?, cancelFile? }`. Returns
+/// render statistics. `startFrame`/`endFrame` select a half-open frame range
+/// that is renumbered from zero. `cancelFile` is a path polled between frames:
+/// creating that file stops the run with a `cancelled` error and publishes
+/// nothing, leaving any previous output intact. Rendering is synchronous on
+/// the calling thread, so cancellation is driven from outside this process.
 #[function(js_name = "renderProject")]
 fn render_project(ctx: CallContext) -> Result<JsValue> {
     let arg = ctx
@@ -34,13 +57,47 @@ fn render_project(ctx: CallContext) -> Result<JsValue> {
         std::fs::create_dir_all(parent)
             .map_err(|e| Error::new(format!("cannot create output directory: {e}")))?;
     }
-    let stats = media::render_project(&project, path, &mut |done, total| {
+    let range = match (optional_u32(arg, "startFrame")?, optional_u32(arg, "endFrame")?) {
+        (None, None) => None,
+        (start, end) => {
+            let start = start.unwrap_or(0);
+            let end = end.ok_or_else(|| Error::new("endFrame is required when startFrame is set"))?;
+            Some(FrameRange { start, end })
+        }
+    };
+    let cancel_file = optional_string(arg, "cancelFile")?;
+    let cancel = || {
+        cancel_file
+            .as_ref()
+            .is_some_and(|path| std::path::Path::new(path).exists())
+    };
+    let options = RenderOptions { range, cancel: Some(&cancel) };
+    let stats = media::render::render_project_with(&project, path, &options, &mut |done, total| {
         if done == total || done % 30 == 0 {
             println!("opencut: frame {done}/{total}");
         }
     })
     .map_err(core_error)?;
     json_to_js(ctx.env(), &to_json(&stats))
+}
+
+fn optional_u32(arg: JsValue, name: &str) -> Result<Option<u32>> {
+    let value = arg.get_named(name)?;
+    if value.is_undefined()? {
+        return Ok(None);
+    }
+    let number = match value.as_i64() {
+        Ok(number) => number,
+        // `null` is how a caller spells "not set"; any other non-numeric value
+        // is a contract violation instead of a silent "whole film".
+        Err(_) if value.as_f64().is_err() => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    u32::try_from(number).map(Some).map_err(|_| Error::new(format!("{name} must be a non-negative frame index")))
+}
+
+fn optional_string(arg: JsValue, name: &str) -> Result<Option<String>> {
+    wae::optional_string_prop(arg, name)
 }
 
 fn core_error(error: media::Error) -> Error {
@@ -58,6 +115,10 @@ fn to_json(stats: &RenderStats) -> serde_json::Value {
         "bytes": stats.bytes,
         "backend": stats.backend,
         "audio": stats.audio,
+        "range": stats.range,
+        "fonts": stats.fonts,
+        "projectHash": stats.project_hash,
+        "optionalMissing": stats.optional_missing,
     })
 }
 
@@ -90,4 +151,4 @@ fn json_to_js(env: Env, value: &serde_json::Value) -> Result<JsValue> {
     }
 }
 
-register_module![version, render_project];
+register_module![version, build, render_project];

@@ -134,6 +134,8 @@ export type Item =
           radius?: number;
           fadeIn?: number;
           fadeOut?: number;
+          /** Required sources must decode; `false` marks a documented empty slot. */
+          required?: boolean;
       }
     | {
           kind: 'video';
@@ -150,6 +152,7 @@ export type Item =
           radius?: number;
           fadeIn?: number;
           fadeOut?: number;
+          required?: boolean;
       }
     | { kind: 'progress'; at: number; dur: number; track?: string | null; fill?: string | null; y?: number | null }
     | {
@@ -327,6 +330,8 @@ export interface AudioClipSpec {
     dur?: number | null;
     offsetFrames?: number;
     volume?: number;
+    /** Imported audio must decode unless the author declares it optional. */
+    required?: boolean;
 }
 
 export interface AudioSpec {
@@ -369,6 +374,19 @@ export interface CameraKey {
     ease?: Ease;
 }
 
+/** Film-level visual controls. An omitted effect is off, not a house default. */
+export interface PostSpec {
+    /** Corner darkening 0..=1; omit for none. */
+    vignette?: number;
+}
+
+/** Explicit font files, one per face. */
+export interface FontsSpec {
+    regular: string;
+    bold: string;
+    mono: string;
+}
+
 export interface Project {
     width: number;
     height: number;
@@ -378,4 +396,6 @@ export interface Project {
     audio?: AudioSpec | null;
     /** One continuous camera move for the whole film. */
     camera?: CameraKey[];
+    post?: PostSpec;
+    fonts?: FontsSpec | null;
 }
