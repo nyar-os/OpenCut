@@ -142,6 +142,12 @@ console.log(
 );
 console.log(`fonts: ${stats.fonts.join(', ')}`);
 console.log(`assets: ${stats.assets.length} fingerprinted`);
+if (stats.audioLevel) {
+    console.log(
+        `audio level: peak ${stats.audioLevel.peakDbfs.toFixed(1)} dBFS, rms ${stats.audioLevel.rmsDbfs.toFixed(1)} dBFS` +
+            (stats.audioLevel.clipped > 0 ? `, clipped ${stats.audioLevel.clipped}` : ''),
+    );
+}
 for (const scene of stats.scenes) {
     console.log(`scene ${scene.id}: frames ${scene.range[0]}..${scene.range[1]}${scene.rendered ? '' : ' (not written)'}`);
 }

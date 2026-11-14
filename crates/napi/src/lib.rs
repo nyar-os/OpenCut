@@ -149,6 +149,12 @@ fn to_json(stats: &RenderStats) -> serde_json::Value {
         "projectHash": stats.project_hash,
         "assets": stats.assets,
         "scenes": stats.scenes,
+        "audioLevel": stats.audio_level.map(|level| json!({
+            "peakDbfs": level.peak_db,
+            "rmsDbfs": level.rms_db,
+            "clipped": level.clipped,
+            "samples": level.samples,
+        })),
         "optionalMissing": stats.optional_missing,
     })
 }

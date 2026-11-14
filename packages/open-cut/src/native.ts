@@ -35,8 +35,22 @@ export interface RenderResult {
     assets: AssetFingerprint[];
     /** Every scene with its frame range and whether it was written. */
     scenes: SceneSpan[];
+    /** Level of the mixed audio bed; `null` when the film has no audio. */
+    audioLevel: AudioLevel | null;
     /** Declared optional resources that stayed empty. */
     optionalMissing: string[];
+}
+
+/** Peak, RMS and clipping facts for one mixed audio bed. */
+export interface AudioLevel {
+    /** Peak level in dBFS. */
+    peakDbfs: number;
+    /** RMS level in dBFS. */
+    rmsDbfs: number;
+    /** Samples at or beyond full scale. */
+    clipped: number;
+    /** Measured interleaved samples. */
+    samples: number;
 }
 
 /** One project scene mapped into frames. */
