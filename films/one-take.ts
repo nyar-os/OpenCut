@@ -9,6 +9,7 @@
  *
  * 运行:node --experimental-strip-types films/one-take.ts one-take.mp4
  */
+import { pathToFileURL } from 'node:url';
 import { Film, bands, code, glow, grain, layer, path, shape, text } from '../packages/open-cut/dist/index.js';
 
 /** One ridge, used by every layer so the cross-fades line up exactly. */
@@ -177,6 +178,10 @@ film.audio({
     ],
 });
 
-const stats = film.render(process.argv[2] ?? 'one-take.mp4');
-console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
-console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+export default film;
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const stats = film.render(process.argv[2] ?? 'one-take.mp4');
+    console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
+    console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+}

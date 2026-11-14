@@ -9,6 +9,7 @@
  *
  * 运行:node --experimental-strip-types films/groove.ts groove.mp4
  */
+import { pathToFileURL } from 'node:url';
 import { Film, bands, grain, shape, text } from '../packages/open-cut/dist/index.js';
 
 const film = new Film({ width: 1280, height: 720, fps: 30 });
@@ -80,6 +81,10 @@ film.audio({
     ],
 });
 
-const stats = film.render(process.argv[2] ?? 'groove.mp4');
-console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
-console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+export default film;
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const stats = film.render(process.argv[2] ?? 'groove.mp4');
+    console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
+    console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+}

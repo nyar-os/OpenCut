@@ -5,6 +5,7 @@
  * film without touching a single item. The second scene overrides the unlocked
  * `ink` role; `accent` is locked and cannot be overridden.
  */
+import { pathToFileURL } from 'node:url';
 import { Film, colorToken, text } from '../packages/open-cut/dist/index.js';
 
 const ink = colorToken('ink');
@@ -41,6 +42,10 @@ film.scene({
 
 export default film;
 
-const stats = film.render(process.argv[2] ?? 'design-tokens.mp4');
-console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
-console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+// Render only when this file is executed directly: importing it from the CLI
+// must not start an export with the CLI's own arguments.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const stats = film.render(process.argv[2] ?? 'design-tokens.mp4');
+    console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
+    console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+}

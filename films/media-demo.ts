@@ -6,6 +6,7 @@
  *
  * 运行:node --experimental-strip-types films/media-demo.ts demo-media.mp4
  */
+import { pathToFileURL } from 'node:url';
 import { Film, card, footnote, image, progress, text, video } from '../packages/open-cut/dist/index.js';
 
 const TITLE = '#e6eefa';
@@ -99,6 +100,10 @@ film.audio({
     ],
 });
 
-const stats = film.render(process.argv[2] ?? 'demo-media.mp4');
-console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
-console.log(`backend: ${stats.backend} · audio: ${stats.audio} · ${Math.round(stats.bytes / 1024)} KiB`);
+export default film;
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const stats = film.render(process.argv[2] ?? 'demo-media.mp4');
+    console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
+    console.log(`backend: ${stats.backend} · audio: ${stats.audio} · ${Math.round(stats.bytes / 1024)} KiB`);
+}

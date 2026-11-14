@@ -10,6 +10,7 @@
  *
  * 运行:node --experimental-strip-types films/voice-sfx.ts voice-sfx.mp4
  */
+import { pathToFileURL } from 'node:url';
 import { Film, bands, glow, grain, shape, text } from '../packages/open-cut/dist/index.js';
 
 const INK = '#e9f0fb';
@@ -90,6 +91,10 @@ film.audio({
     ],
 });
 
-const stats = film.render(process.argv[2] ?? 'voice-sfx.mp4');
-console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
-console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+export default film;
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+    const stats = film.render(process.argv[2] ?? 'voice-sfx.mp4');
+    console.log(`rendered ${stats.frames} frames (${stats.seconds.toFixed(1)}s) -> ${stats.out}`);
+    console.log(`backend: ${stats.backend} · audio: ${stats.audio}`);
+}
