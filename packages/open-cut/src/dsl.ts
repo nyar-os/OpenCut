@@ -254,6 +254,25 @@ export class Film {
         return this.sceneList.reduce((sum, scene) => sum + scene.duration, 0);
     }
 
+    /** Half-open frame range of one named scene.
+     *
+     * The range matches the `scenes` report a render returns, so a review note
+     * or a partial re-render can name a block instead of counting frames. An
+     * unknown id is an explicit error, never a silent whole-film render.
+     */
+    sceneRange(id: string): [number, number] {
+        let cursor = 0;
+        for (const scene of this.sceneList) {
+            const duration = Math.max(1, frames(scene.duration, this.fps));
+            if (scene.id === id) {
+                return [cursor, cursor + duration];
+            }
+            cursor += duration;
+        }
+        const known = this.sceneList.map((scene, index) => scene.id ?? `scene-${index}`).join(', ');
+        throw new Error(`no scene with id \`${id}\`; scenes: ${known}`);
+    }
+
     /** Compiles to the frame-based scene IR. */
     toProject(): Project {
         let cursor = 0;

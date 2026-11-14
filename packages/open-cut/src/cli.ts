@@ -3,7 +3,7 @@
  * OpenCut CLI — compile a film script into an MP4.
  *
  * Usage:
- *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--cancel-file path] [--json]
+ *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--scene id] [--cancel-file path] [--json]
  *   open-cut preview <film.mjs|film.ts> --frame N --out file.png [--json]
  *   open-cut build [--json]
  *   open-cut version
@@ -107,8 +107,20 @@ const to = flag(args, '--to');
 if ((from === undefined) !== (to === undefined)) {
     fail('--from and --to must be given together', 2);
 }
-const startFrame = from === undefined ? undefined : Math.round(Number(from) * film.fps);
-const endFrame = to === undefined ? undefined : Math.round(Number(to) * film.fps);
+const sceneId = flag(args, '--scene');
+if (sceneId !== undefined && from !== undefined) {
+    fail('--scene cannot be combined with --from/--to', 2);
+}
+let startFrame = from === undefined ? undefined : Math.round(Number(from) * film.fps);
+let endFrame = to === undefined ? undefined : Math.round(Number(to) * film.fps);
+if (sceneId !== undefined) {
+    try {
+        ([startFrame, endFrame] = film.sceneRange(sceneId));
+    }
+    catch (error) {
+        fail(error instanceof Error ? error.message : String(error), 2);
+    }
+}
 
 const stats = (() => {
     try {
