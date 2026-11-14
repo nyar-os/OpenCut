@@ -3,9 +3,9 @@
  * OpenCut CLI — compile a film script into an MP4.
  *
  * Usage:
- *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--cancel-file path]
- *   open-cut preview <film.mjs|film.ts> --frame N --out file.png
- *   open-cut build
+ *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--cancel-file path] [--json]
+ *   open-cut preview <film.mjs|film.ts> --frame N --out file.png [--json]
+ *   open-cut build [--json]
  *   open-cut version
  *
  * The film module must default-export a `Film` instance (or an object with a
@@ -46,7 +46,12 @@ if (command === 'version' || command === undefined) {
 
 if (command === 'build') {
     const build = nativeBuild();
-    console.log(`${build.version} ${build.sourceRev}${build.dirty ? ' (dirty)' : ''} [${build.profile}]`);
+    if (args.includes('--json')) {
+        console.log(JSON.stringify(build, null, 2));
+    }
+    else {
+        console.log(`${build.version} ${build.sourceRev}${build.dirty ? ' (dirty)' : ''} [${build.profile}]`);
+    }
     process.exit(0);
 }
 
@@ -68,6 +73,10 @@ if (command === 'preview') {
     const frame = Math.round(Number(frameArg));
     try {
         const stats = film.preview(frame, path.resolve(outArg));
+        if (args.includes('--json')) {
+            console.log(JSON.stringify(stats, null, 2));
+            process.exit(0);
+        }
         console.log(`frame ${stats.frame} -> ${outArg} [${stats.width}x${stats.height}, project ${stats.projectHash}]`);
         console.log(`fonts: ${stats.fonts.join(', ')}`);
     }
@@ -111,6 +120,10 @@ const stats = (() => {
         fail(error instanceof Error ? error.message : String(error), 1);
     }
 })();
+if (args.includes('--json')) {
+    console.log(JSON.stringify(stats, null, 2));
+    process.exit(0);
+}
 console.log(
     `rendered frames ${stats.range[0]}..${stats.range[1]} (${stats.frames} frames, ${(stats.frames / stats.fps).toFixed(1)}s) -> ${stats.out} ` +
         `[${stats.backend}, ${Math.round(stats.bytes / 1024)} KiB, project ${stats.projectHash}]`,
