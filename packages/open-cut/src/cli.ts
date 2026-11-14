@@ -4,7 +4,7 @@
  *
  * Usage:
  *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--scene id] [--cancel-file path] [--json]
- *   open-cut verify <film.mjs|film.ts> --out file.mp4 [--json]
+ *   open-cut verify <film.mjs|film.ts> --out file.mp4 [--from s] [--to s] [--json]
  *   open-cut preview <film.mjs|film.ts> --frame N --out file.png [--json]
  *   open-cut preview <film.mjs|film.ts> --at seconds --out file.png [--json]
  *   open-cut preview <film.mjs|film.ts> --from s --to s --out dir [--json]
@@ -147,14 +147,23 @@ if (command === 'verify') {
     if (outArg === undefined) {
         fail('verify requires --out <file.mp4>', 2);
     }
+    const fromArg = flag(args, '--from');
+    const toArg = flag(args, '--to');
+    if ((fromArg === undefined) !== (toArg === undefined)) {
+        fail('--from and --to must be given together', 2);
+    }
     const module = await import(pathToFileURL(path.resolve(script)).href);
     const film: unknown = module.default ?? module.film;
     if (!(film instanceof Film)) {
         fail('the film module must default-export a Film instance', 2);
     }
+    const range =
+        fromArg !== undefined && toArg !== undefined
+            ? { startFrame: secondsToFrame(fromArg, film.fps, '--from'), endFrame: secondsToFrame(toArg, film.fps, '--to') }
+            : undefined;
     const stats = (() => {
         try {
-            return film.render(path.resolve(outArg));
+            return film.render(path.resolve(outArg), range);
         }
         catch (error) {
             fail(error instanceof Error ? error.message : String(error), 1);
