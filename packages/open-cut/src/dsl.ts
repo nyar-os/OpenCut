@@ -56,6 +56,8 @@ interface TimedInput {
 }
 
 export type SceneInput = {
+    /** Stable identity for storyboard mapping, revision notes and locks. */
+    id?: string;
     duration: number;
     background?: Background;
     items?: ItemInput[];
@@ -260,6 +262,7 @@ export class Film {
             const duration = Math.max(1, frames(scene.duration, this.fps));
             cursor = start + duration;
             return {
+                id: scene.id,
                 start,
                 duration,
                 background: scene.background,

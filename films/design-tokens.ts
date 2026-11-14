@@ -20,6 +20,7 @@ const film = new Film({ width: 1280, height: 720, fps: 30 }).design({
 });
 
 film.scene({
+    id: 'card',
     duration: 2.5,
     background: { kind: 'v-gradient', colors: [panel, accent] },
     items: [
@@ -29,6 +30,7 @@ film.scene({
 });
 
 film.scene({
+    id: 'scene-override',
     duration: 2.5,
     design: { colors: [{ role: 'ink', value: '#ffd9a0' }] },
     background: { kind: 'solid', color: panel },

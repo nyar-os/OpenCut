@@ -22,7 +22,7 @@ export type {
     ShapeOptions,
     TextOptions,
 } from './dsl.js';
-export type { AssetFingerprint, BuildInfo, PreviewResult, RenderOptions, RenderResult } from './native.js';
+export type { AssetFingerprint, BuildInfo, PreviewResult, RenderOptions, RenderResult, SceneSpan } from './native.js';
 export { native } from './native.js';
 export type * from './types.js';
 

@@ -130,6 +130,9 @@ console.log(
 );
 console.log(`fonts: ${stats.fonts.join(', ')}`);
 console.log(`assets: ${stats.assets.length} fingerprinted`);
+for (const scene of stats.scenes) {
+    console.log(`scene ${scene.id}: frames ${scene.range[0]}..${scene.range[1]}${scene.rendered ? '' : ' (not written)'}`);
+}
 if (stats.optionalMissing.length > 0) {
     console.log(`optional slots left empty: ${stats.optionalMissing.join(', ')}`);
 }

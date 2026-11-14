@@ -33,8 +33,20 @@ export interface RenderResult {
     projectHash: string;
     /** External files the render loaded, with byte length and hash. */
     assets: AssetFingerprint[];
+    /** Every scene with its frame range and whether it was written. */
+    scenes: SceneSpan[];
     /** Declared optional resources that stayed empty. */
     optionalMissing: string[];
+}
+
+/** One project scene mapped into frames. */
+export interface SceneSpan {
+    /** Declared scene id, or `scene-{index}` when the scene was not named. */
+    id: string;
+    /** Half-open project frame range of the scene. */
+    range: [number, number];
+    /** Whether this scene intersects the frame range that was written. */
+    rendered: boolean;
 }
 
 /** One external file a render loaded, fingerprinted from its bytes. */
