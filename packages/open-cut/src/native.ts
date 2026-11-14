@@ -49,10 +49,20 @@ export interface BuildInfo {
     profile: string;
 }
 
+export interface PreviewResult {
+    frame: number;
+    width: number;
+    height: number;
+    /** Font files the preview loaded, in role order. */
+    fonts: string[];
+    projectHash: string;
+}
+
 export interface NativeBinding {
     version(): string;
     build(): BuildInfo;
     renderProject(options: { project: string; out: string } & RenderOptions): RenderResult;
+    previewFrame(options: { project: string; frame: number; out: string }): PreviewResult;
 }
 
 const PLATFORM_PACKAGE = '@wae/open-cut-win32-x64';

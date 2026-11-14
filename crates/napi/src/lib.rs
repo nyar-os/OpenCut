@@ -81,6 +81,34 @@ fn render_project(ctx: CallContext) -> Result<JsValue> {
     json_to_js(ctx.env(), &to_json(&stats))
 }
 
+/// Render one project frame into a PNG.
+///
+/// Argument: `{ project, frame, out }`. This is the preview path: it runs the
+/// same contract checks and painter as `renderProject`, so a reviewed frame is
+/// the frame an export receives. Audio is not synthesized for a preview.
+#[function(js_name = "previewFrame")]
+fn preview_frame(ctx: CallContext) -> Result<JsValue> {
+    let arg = ctx
+        .args()
+        .first()
+        .copied()
+        .ok_or_else(|| Error::new("previewFrame requires an options object"))?;
+    let project = arg.get_named("project")?.as_string()?;
+    let out = arg.get_named("out")?.as_string()?;
+    let frame = optional_u32(arg, "frame")?.ok_or_else(|| Error::new("previewFrame requires a frame index"))?;
+    let stats = media::render::preview_frame(&project, frame, std::path::Path::new(&out)).map_err(core_error)?;
+    json_to_js(
+        ctx.env(),
+        &json!({
+            "frame": stats.frame,
+            "width": stats.width,
+            "height": stats.height,
+            "fonts": stats.fonts,
+            "projectHash": stats.project_hash,
+        }),
+    )
+}
+
 fn optional_u32(arg: JsValue, name: &str) -> Result<Option<u32>> {
     let value = arg.get_named(name)?;
     if value.is_undefined()? {
@@ -151,4 +179,4 @@ fn json_to_js(env: Env, value: &serde_json::Value) -> Result<JsValue> {
     }
 }
 
-register_module![version, build, render_project];
+register_module![version, build, render_project, preview_frame];

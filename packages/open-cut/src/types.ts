@@ -34,7 +34,50 @@ export interface CodeTheme {
     function?: string;
 }
 
-export type Item =
+/** One key of a property track, positioned by local frame. */
+export interface Keyframe<T> {
+    at: number;
+    value: T;
+    ease?: Ease;
+}
+
+/** One property over time. */
+export interface Track<T> {
+    keys: Keyframe<T>[];
+    /** Hold the end values outside the keyed range (default true). */
+    clamp?: boolean;
+}
+
+/** A path a node travels along; `progress` times the travel. */
+export interface Follow {
+    points: Array<[number, number]>;
+    smooth?: boolean;
+    closed?: boolean;
+}
+
+/**
+ * Motion declared on a node. Tracks are evaluated in the node's local frames,
+ * so they share the clock of the item's own `at`/`dur`.
+ */
+export interface Animated {
+    x?: Track<number>;
+    y?: Track<number>;
+    opacity?: Track<number>;
+    progress?: Track<number>;
+    follow?: Follow;
+}
+
+/** Fields every node carries on top of its item kind. */
+export interface NodeFields {
+    /** Stable identity a revision, lock or note can point at. */
+    id?: string;
+    /** Motion evaluated in this node's local frames. */
+    anim?: Animated;
+}
+
+export type Item = NodeFields & ItemBody;
+
+export type ItemBody =
     | {
           kind: 'text';
           at: number;
@@ -195,7 +238,29 @@ export type Item =
           intensity?: number;
           fadeIn?: number;
           fadeOut?: number;
+      }
+    | {
+          kind: 'instance';
+          at: number;
+          dur: number;
+          /** Id of a `components` entry. */
+          component: string;
+          x: number;
+          y: number;
+          w: number;
+          h: number;
+          fit?: Fit;
+          opacity?: number;
+          fadeIn?: number;
+          fadeOut?: number;
+          required?: boolean;
       };
+
+/** A reusable element that instances place by id. */
+export interface Component {
+    id: string;
+    items: Item[];
+}
 
 export interface BgmSpec {
     volume?: number;
@@ -393,6 +458,8 @@ export interface Project {
     fps: number;
     durationFrames: number;
     scenes: Scene[];
+    /** Reusable element definitions referenced by `instance` items. */
+    components?: Component[];
     audio?: AudioSpec | null;
     /** One continuous camera move for the whole film. */
     camera?: CameraKey[];

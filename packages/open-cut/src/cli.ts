@@ -4,6 +4,7 @@
  *
  * Usage:
  *   open-cut render <film.mjs|film.ts> [--out file.mp4] [--from s] [--to s] [--cancel-file path]
+ *   open-cut preview <film.mjs|film.ts> --frame N --out file.png
  *   open-cut build
  *   open-cut version
  *
@@ -46,6 +47,33 @@ if (command === 'version' || command === undefined) {
 if (command === 'build') {
     const build = nativeBuild();
     console.log(`${build.version} ${build.sourceRev}${build.dirty ? ' (dirty)' : ''} [${build.profile}]`);
+    process.exit(0);
+}
+
+if (command === 'preview') {
+    const script = args[1];
+    if (!script) {
+        fail('preview requires a film script path', 2);
+    }
+    const frameArg = flag(args, '--frame');
+    const outArg = flag(args, '--out');
+    if (frameArg === undefined || outArg === undefined) {
+        fail('preview requires --frame <index> and --out <file.png>', 2);
+    }
+    const module = await import(pathToFileURL(path.resolve(script)).href);
+    const film: unknown = module.default ?? module.film;
+    if (!(film instanceof Film)) {
+        fail('the film module must default-export a Film instance', 2);
+    }
+    const frame = Math.round(Number(frameArg));
+    try {
+        const stats = film.preview(frame, path.resolve(outArg));
+        console.log(`frame ${stats.frame} -> ${outArg} [${stats.width}x${stats.height}, project ${stats.projectHash}]`);
+        console.log(`fonts: ${stats.fonts.join(', ')}`);
+    }
+    catch (error) {
+        fail(error instanceof Error ? error.message : String(error), 1);
+    }
     process.exit(0);
 }
 

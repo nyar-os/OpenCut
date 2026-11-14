@@ -5,8 +5,24 @@
  * compiled artifact.
  */
 import { native } from './native.js';
-import type { RenderOptions, RenderResult } from './native.js';
-import type { AudioSpec, Background, CodeTheme, FontsSpec, Item, NoteInput, PatternInput, PostSpec, Project, SfxInput, VoiceInput } from './types.js';
+import type { PreviewResult, RenderOptions, RenderResult } from './native.js';
+import type {
+    Animated,
+    AudioSpec,
+    Background,
+    CodeTheme,
+    Component,
+    FontsSpec,
+    Item,
+    Keyframe,
+    NoteInput,
+    PatternInput,
+    PostSpec,
+    Project,
+    SfxInput,
+    Track,
+    VoiceInput,
+} from './types.js';
 
 export type Ease =
     | 'linear'
@@ -57,6 +73,20 @@ export type CameraInput = {
 /** Item input: same fields as the IR but `at`/`dur`/fades in seconds. */
 export type ItemInput = TimedInput & { kind: string } & Record<string, unknown>;
 
+/** Fields every node accepts on top of its kind. */
+export interface NodeOptions {
+    /** Stable identity for revisions, locks and notes. */
+    id?: string;
+    /** Motion with keys in seconds relative to the item's own start. */
+    anim?: AnimInput;
+}
+
+/** A reusable element declared on a film. */
+export interface ComponentInput {
+    id: string;
+    items: ItemInput[];
+}
+
 const DEFAULT_FADE = 0.35;
 
 function frames(seconds: number, fps: number): number {
@@ -71,12 +101,55 @@ function compileItem(item: ItemInput, fps: number, sceneSeconds: number): Item {
     // exactly on a frame instead of getting an implicit one-frame ramp.
     out['fadeIn'] = Math.max(0, frames((item.fadeIn ?? DEFAULT_FADE) as number, fps));
     out['fadeOut'] = Math.max(0, frames((item.fadeOut ?? DEFAULT_FADE) as number, fps));
+    out['anim'] = compileAnim(item['anim'] as AnimInput | undefined, fps);
     // A layer's children keep their own (layer-relative) timing, in seconds.
     if (item.kind === 'layer' && Array.isArray(item['items'])) {
         const children = item['items'] as ItemInput[];
         out['items'] = children.map((child) => compileItem(child, fps, sceneSeconds));
     }
     return out as unknown as Item;
+}
+
+/** Track keys authored in seconds; the core reads local frames. */
+type AnimInput = {
+    x?: Array<{ at: number; value: number; ease?: Ease }>;
+    y?: Array<{ at: number; value: number; ease?: Ease }>;
+    opacity?: Array<{ at: number; value: number; ease?: Ease }>;
+    progress?: Array<{ at: number; value: number; ease?: Ease }>;
+    follow?: { points: Array<[number, number]>; smooth?: boolean; closed?: boolean };
+};
+
+function compileTrack<T>(keys: Array<Keyframe<T>> | undefined, fps: number): Track<T> | undefined {
+    if (!keys) {
+        return undefined;
+    }
+    return { keys: keys.map((key) => ({ ...key, at: frames(key.at, fps) })) };
+}
+
+function compileAnim(input: AnimInput | Animated | undefined, fps: number): Animated | undefined {
+    if (!input) {
+        return undefined;
+    }
+    const anim: Animated = {};
+    const x = compileTrack(input.x as Keyframe<number>[], fps);
+    const y = compileTrack(input.y as Keyframe<number>[], fps);
+    const opacity = compileTrack(input.opacity as Keyframe<number>[], fps);
+    const progress = compileTrack(input.progress as Keyframe<number>[], fps);
+    if (x) anim.x = x;
+    if (y) anim.y = y;
+    if (opacity) anim.opacity = opacity;
+    if (progress) anim.progress = progress;
+    if (input.follow) anim.follow = input.follow;
+    return anim;
+}
+
+/**
+ * Motion for one node, with every key authored in seconds relative to the
+ * item's own start. Position is normalized frame coordinates; `progress` drives
+ * both "how much is drawn" and travel along `follow`.
+ */
+export function anim(spec: AnimInput): AnimInput {
+    return spec;
 }
 
 /** A film: scenes plus the audio bed, compiled to the core IR. */
@@ -87,6 +160,7 @@ export class Film {
     private readonly post: PostSpec;
     private readonly fonts: FontsSpec | null;
     private readonly sceneList: SceneInput[] = [];
+    private readonly componentList: ComponentInput[] = [];
     private audioSpec: AudioSpec | null = null;
     private cameraKeys: Array<{ at: number; zoom: number; focus: [number, number]; rotate: number; ease: Ease }> = [];
 
@@ -101,6 +175,13 @@ export class Film {
     /** Appends a scene; scenes run back to back in call order. */
     scene(input: SceneInput): this {
         this.sceneList.push(input);
+        return this;
+    }
+
+    /** Declares a reusable element. Instances reference it by `id`, so one
+     *  edit updates every placement. */
+    component(id: string, items: ItemInput[]): this {
+        this.componentList.push({ id, items });
         return this;
     }
 
@@ -186,11 +267,24 @@ export class Film {
             fps: this.fps,
             durationFrames: cursor,
             scenes,
+            components: this.componentList.map((component) => ({
+                id: component.id,
+                items: component.items.map((item) => compileItem(item, this.fps, this.seconds)),
+            })),
             audio: this.audioSpec,
             camera: this.cameraKeys,
             post: this.post,
             fonts: this.fonts,
         };
+    }
+
+    /** Renders one frame into a PNG.
+     *
+     * The preview runs the same contract checks and painter as an export, so a
+     * reviewed frame is the frame the encoder receives. `frame` is an absolute
+     * project frame index. */
+    preview(frame: number, outPath: string): PreviewResult {
+        return native.previewFrame({ project: JSON.stringify(toWire(this.toProject())), frame, out: outPath });
     }
 
     /** Renders the compiled project into `outPath` (MP4).
@@ -235,7 +329,7 @@ export function toWire(value: unknown): unknown {
 // Item constructors (all times in seconds, positions normalized 0..1)
 // ---------------------------------------------------------------------------
 
-export interface TextOptions {
+export interface TextOptions extends NodeOptions {
     at?: number;
     dur?: number;
     content: string;
@@ -268,7 +362,7 @@ export function text(options: TextOptions): ItemInput {
     return { kind: 'text', color: '#e6eefa', x: 0.5, align: 'center', dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
-export interface CodeOptions {
+export interface CodeOptions extends NodeOptions {
     at?: number;
     dur?: number;
     lines: string[];
@@ -286,7 +380,7 @@ export function code(options: CodeOptions): ItemInput {
     return { kind: 'code', x: 0.18, size: 34, dur: options.dur ?? 5, ...options } as ItemInput;
 }
 
-export interface CounterOptions {
+export interface CounterOptions extends NodeOptions {
     at?: number;
     dur?: number;
     from: number;
@@ -307,7 +401,7 @@ export function counter(options: CounterOptions): ItemInput {
     return { kind: 'counter', x: 0.5, size: 150, color: '#f0f6ff', ease: 'out-quint', dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
-export interface CardOptions {
+export interface CardOptions extends NodeOptions {
     at?: number;
     dur?: number;
     x: number;
@@ -327,7 +421,7 @@ export function card(options: CardOptions): ItemInput {
     return { kind: 'card', w: 0.2, h: 0.16, accent: '#6ea0ff', dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
-export interface ShapeOptions {
+export interface ShapeOptions extends NodeOptions {
     at?: number;
     dur?: number;
     shape: 'rect' | 'circle' | 'ring' | 'line';
@@ -370,7 +464,7 @@ export function grain(options: { at?: number; dur?: number; strength?: number; d
     return { kind: 'grain', strength: 0.05, density: 9000, dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
-export interface PathOptions {
+export interface PathOptions extends NodeOptions {
     at?: number;
     dur?: number;
     /** Control points in normalized frame coordinates. */
@@ -405,7 +499,7 @@ export function path(options: PathOptions): ItemInput {
  * zoom windows cross-fade instead of cutting, which is what lets a single
  * continuous camera move carry the film from one idea to the next.
  */
-export interface LayerOptions {
+export interface LayerOptions extends NodeOptions {
     at?: number;
     dur?: number;
     zoomFrom: number;
@@ -420,7 +514,7 @@ export function layer(options: LayerOptions): ItemInput {
 
 /** Soft additive light. A disc with a hard edge reads as a sticker, this reads
  *  as light; `radius` is a fraction of the frame width. */
-export interface GlowOptions {
+export interface GlowOptions extends NodeOptions {
     at?: number;
     dur?: number;
     x: number;
@@ -436,7 +530,7 @@ export function glow(options: GlowOptions): ItemInput {
     return { kind: 'glow', color: '#f2c98a', intensity: 1, dur: options.dur ?? 6, ...options } as ItemInput;
 }
 
-export interface FootnoteOptions {
+export interface FootnoteOptions extends NodeOptions {
     at?: number;
     dur?: number;
     text: string;
@@ -492,6 +586,25 @@ export function video(options: {
     required?: boolean;
 }): ItemInput {
     return { kind: 'video', x: 0.5, y: 0.5, w: 0.4, h: 0.4, fit: 'contain', opacity: 1, dur: options.dur ?? 4, ...options } as ItemInput;
+}
+
+/** One placement of a declared component. The definition is painted once and
+ *  this box controls where it lands, so reuse never copies the content. */
+export function instance(options: {
+    at?: number;
+    dur?: number;
+    component: string;
+    x: number;
+    y: number;
+    w?: number;
+    h?: number;
+    fit?: 'contain' | 'cover' | 'stretch';
+    opacity?: number;
+    fadeIn?: number;
+    fadeOut?: number;
+    required?: boolean;
+} & NodeOptions): ItemInput {
+    return { kind: 'instance', w: 0.4, h: 0.4, fit: 'contain', opacity: 1, dur: options.dur ?? 4, ...options } as ItemInput;
 }
 
 /** The only "timeline" a code-first film shows: a global progress bar. */
